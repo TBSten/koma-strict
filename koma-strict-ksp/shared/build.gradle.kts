@@ -1,46 +1,53 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.maven.publish)
 }
 
 kotlin {
     explicitApi()
+    jvmToolchain(17)
 
-    android {
-        namespace = "me.tbsten.koma.strict.koma-strict-runtime"
-        compileSdk = 36
-        minSdk = 23
-        androidResources.enable = true
-        compilerOptions { jvmTarget = JvmTarget.JVM_17 }
-    }
+    compilerOptions.optIn.addAll(
+        "me.tbsten.koma.strict.InternalKomaStrictApi",
+    )
 
-    jvm {
-        compilerOptions { jvmTarget = JvmTarget.JVM_17 }
+    jvm()
+    js {
+        browser()
+        nodejs()
     }
-    js { browser() }
-    wasmJs { browser() }
-    iosArm64()
-    iosSimulatorArm64()
+    wasmJs {
+        browser()
+        nodejs()
+    }
 
     sourceSets {
         commonMain.dependencies {
+            // shared の公開 API に付ける @InternalKomaStrictApi (opt-in marker) を参照する
+            implementation(project(":koma-strict-runtime"))
         }
-
         commonTest.dependencies {
-            implementation(kotlin("test"))
+            // TODO: io.kotest Gradle plugin (KSP ベースの per-target spec launcher 生成) を配線し、
+            //       kotest-framework-engine を入れてテストを commonTest に移し js/wasmJs でも実行する。
+            //       Kotlin 2.4.0 + KSP 2.3.10 との互換を確認できるまで shared のテストは jvmTest のみで書く。
         }
-
+        jvmTest.dependencies {
+            implementation(libs.kotest.assertions.core)
+            implementation(libs.kotest.runner.junit5)
+            implementation(libs.kotest.property)
+        }
     }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
 
 //Publishing your Kotlin Multiplatform library to Maven Central
 //https://www.jetbrains.com/help/kotlin-multiplatform-dev/multiplatform-publish-libraries.html
 mavenPublishing {
     publishToMavenCentral()
-    coordinates(group.toString(), "koma-strict-runtime", version.toString())
+    coordinates(group.toString(), "koma-strict-ksp-shared", version.toString())
 
     pom {
         name = "koma-strict"
