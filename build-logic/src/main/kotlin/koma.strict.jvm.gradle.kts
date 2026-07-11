@@ -6,4 +6,8 @@ plugins {
 kotlin {
     explicitApi()
     jvmToolchain(17)
+
+    compilerOptions {
+        configureCommon()
+    }
 }
