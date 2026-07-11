@@ -1,6 +1,9 @@
 plugins {
+    // ターゲット構成が koma.strict.kmp (android/ios 込み) と異なる (jvm/js/wasmJs + nodejs) ため
+    // KMP 構成はこのファイルに直書きし、publish だけ convention plugin に寄せる
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.maven.publish)
+    id("koma.strict.test")
+    id("koma.strict.publish")
 }
 
 kotlin {
@@ -37,43 +40,4 @@ kotlin {
             implementation(libs.kotest.property)
         }
     }
-}
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-}
-
-//Publishing your Kotlin Multiplatform library to Maven Central
-//https://www.jetbrains.com/help/kotlin-multiplatform-dev/multiplatform-publish-libraries.html
-mavenPublishing {
-    publishToMavenCentral()
-    coordinates(group.toString(), "koma-strict-ksp-shared", version.toString())
-
-    pom {
-        name = "koma-strict"
-        description = "Kotlin Multiplatform library"
-        url = "github url" //todo
-
-        licenses {
-            license {
-                name = "MIT"
-                url = "https://opensource.org/licenses/MIT"
-            }
-        }
-
-        developers {
-            developer {
-                id = "" //todo github nickname
-                name = "" //todo full name
-                email = "" //todo email
-            }
-        }
-
-        scm {
-            url = "github url" //todo
-        }
-    }
-    // ローカル publish 時のみ署名をスキップ。CI (Maven Central publish) は
-    // ORG_GRADLE_PROJECT_signingInMemoryKey* を注入する設計なので常に署名する (cream イディオム)
-    if (!(gradle.startParameter.taskNames.contains("publishToMavenLocal"))) signAllPublications()
 }
