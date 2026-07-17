@@ -14,10 +14,11 @@ description: >-
 
 koma-strict は State 定義の annotation から strict な store factory を生成する KSP plugin。
 feature ごとに `<Feat>Spec` が入力プログラムをコンパイルし、生成物を golden 比較する。
-現在の live reference は **`feature/strictStore/`** (placeholder feature、DSL 確定後に置き換え):
+現在の live reference は **`feature/storeSpec/`** (@StoreSpec 本実装):
 
-- spec: `koma-strict-ksp/src/test/kotlin/me/tbsten/koma/strict/ksp/feature/strictStore/ProcessStrictStoreSpec.kt`
-- scenario: 同 `feature/strictStore/scenario/StrictStoreScenarios.kt`
+- spec: `koma-strict-ksp/src/test/kotlin/me/tbsten/koma/strict/ksp/feature/storeSpec/ProcessStoreSpecSpec.kt`
+- scenario: 同 `feature/storeSpec/scenario/StoreSpec*Scenarios.kt` (basic / hierarchy / hook / diagnostics)
+- 入力が参照する koma API は `testing/fixtures/KomaApiStub.kt` のスタブが compile harness で常に同梱される
 
 この skill は cream の `cream-snapshot-test` skill の koma-strict 版。feature 数が増えて
 scenario family が育ったら、cream 版の family 体系 (11 families + feature-specific) を参考に拡張する:

@@ -15,7 +15,7 @@ paths:
 |---|---|---|
 | root | `ksp/*.kt` | KSP エントリ。**`KomaStrictSymbolProcessor` / `KomaStrictSymbolProcessorProvider` / `ProcessContext` の 3 ファイルのみ**。生成ロジック・ヘルパ・例外を直下に置かない (例外階層・options・命名は `:koma-strict-ksp:shared` 側) |
 | feature | `ksp/feature/<name>/` | 注釈ごとの入口「発見 → 検証 → core 呼び出し」。生成ロジックは持たない。`feature.<name>` の 1 階層のみ (直下・深いネスト禁止) |
-| core | `ksp/core/<sub>/` | koma-strict 固有の生成ロジック (`common` / `strictStore`)。`core/` 直下に .kt を置かない |
+| core | `ksp/core/<sub>/` | koma-strict 固有のロジック (`common` / `storeSpec` = model 構築・検証)。文字列 codegen は KSP 非依存の `:koma-strict-ksp:shared` の `codegen` package。`core/` 直下に .kt を置かない |
 | util | `ksp/util/` | 汎用ヘルパのみ。直下は Kotlin-only、KSP 依存ヘルパは `util/ksp/`。koma-strict 固有型を参照しない |
 
 ## Dependency direction (one-way)
@@ -79,5 +79,6 @@ feature ─▶ ProcessContext   （唯一の上向き依存。ProcessContext は
 4. `KomaStrictSymbolProcessor.process()` の `buildList` に `addAll(processXxx())` を追加
 5. snapshot / diagnostic test を追加 (`ksp-test.md` と `koma-strict-snapshot-test` skill 準拠)
 
-> 現状の feature は placeholder の `strictStore` のみ
-> (doc/internal/generate-strict-store-factory-dsl.md の DSL 実装時に置き換える)。
+> 現状の feature は `storeSpec` (@StoreSpec -> strict store factory DSL 生成) のみ。
+> パイプラインは「feature/storeSpec (発見) -> core/storeSpec (StoreSpec model 構築 + 検証) ->
+> shared の codegen (KSP 非依存の文字列生成) -> createNewKotlinFile (書き出し)」。

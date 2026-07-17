@@ -24,15 +24,17 @@ golden のパスになる。koma-strict-ksp は JVM のみなので `kotest-runn
 ```
 koma-strict-ksp/src/test/kotlin/me/tbsten/koma/strict/ksp/
 ├── AllKotlinFilesTest.kt       # 全ファイル横断 Konsist（root 直下許可ファイル / 行数上限 300）
+├── OptionsDiagnosticSpec.kt    # 不正 KSP option 値の診断 e2e（lazy パース → clean COMPILATION_ERROR）
 ├── feature/
 │   ├── ArchTest.kt             # feature 層レイヤリング Konsist
-│   └── strictStore/
-│       ├── ProcessStrictStoreSpec.kt       # generator 駆動 snapshot spec
-│       └── scenario/StrictStoreScenarios.kt # 手書き SnapshotSource の scenario 群
+│   └── storeSpec/
+│       ├── ProcessStoreSpecSpec.kt          # generator 駆動 snapshot spec (正常系 + 診断)
+│       └── scenario/StoreSpec*Scenarios.kt  # 手書き SnapshotSource の scenario 群 (basic / hierarchy / hook / diagnostics)
 ├── core/ArchTest.kt            # core / util 層レイヤリング Konsist
 └── testing/                    # テスト基盤 (feature 非依存。再発明せず必ず再利用する)
     ├── compile/                # KomaStrictCompilation (compileWithKomaStrict + useKsp2) /
     │                           # Result ラッパー / RunCompileSnapshotTest / options レンダリング
+    ├── fixtures/KomaApiStub.kt # kctfork 入力に常に含める koma API 互換スタブ (rc02 実物確認はスパイク (d))
     ├── snapshot/SnapshotAssertion.kt  # golden 比較 (assertMatchesSnapshot / facet)
     ├── generator/              # Generator + cartesian / union / map / withRepresentativeValues
     ├── scenario/SnapshotScenario.kt
