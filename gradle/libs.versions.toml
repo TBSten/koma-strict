@@ -5,6 +5,8 @@ koma-strict = "0.1.0"
 
 kotlin = "2.4.0"
 agp = "9.0.0"
+# integrationTest 用の実物 koma (Maven Central 実在確認済み。rc03 も公開されているが設計の正は rc02)
+koma = "4.0.0-rc02"
 maven-publish = "0.34.0"
 ksp = "2.3.10"
 kotest = "6.2.2"
@@ -16,6 +18,8 @@ mockk = "1.14.6"
 [libraries]
 
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+koma-core = { module = "io.github.koma-kt:koma-core", version.ref = "koma" }
+koma-test = { module = "io.github.koma-kt:koma-test", version.ref = "koma" }
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-framework-engine = { module = "io.kotest:kotest-framework-engine", version.ref = "kotest" }

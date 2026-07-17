@@ -40,3 +40,5 @@ rootProject.name = "koma-strict"
 include(":koma-strict-runtime")
 include(":koma-strict-ksp")
 include(":koma-strict-ksp:shared")
+// 実モジュールに KSP plugin を適用して実物 koma-core に対する生成コードを検証する統合テスト (publish しない)
+include(":integrationTest")
