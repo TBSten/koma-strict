@@ -21,7 +21,7 @@ import me.tbsten.koma.strict.ksp.testing.compile.runCompileSnapshotTest
  */
 internal class RunCompileSnapshotTestSmokeTest :
     FreeSpec({
-        "@StrictStore の source をコンパイルし、結果を assertions に公開し、返り値としても返す" {
+        "@StoreSpec の source をコンパイルし、結果を assertions に公開し、返り値としても返す" {
             var observed: KomaStrictCompilationResult? = null
 
             val result =
@@ -33,11 +33,23 @@ internal class RunCompileSnapshotTestSmokeTest :
                                 """
                                 package smoke.compile
 
-                                import me.tbsten.koma.strict.StrictStore
+                                import koma.core.Action
+                                import koma.core.State
+                                import me.tbsten.koma.strict.OnAction
+                                import me.tbsten.koma.strict.StoreSpec
 
-                                @StrictStore
-                                sealed interface MyState {
-                                    data object Loading : MyState
+                                @StoreSpec
+                                sealed interface MyState : State {
+                                    companion object
+
+                                    @OnAction<MyAction.Load>(nextState = [Loaded::class])
+                                    interface Idle : MyState { companion object }
+
+                                    interface Loaded : MyState { companion object }
+                                }
+
+                                sealed interface MyAction : Action {
+                                    data object Load : MyAction
                                 }
                                 """.trimIndent(),
                         ),
@@ -47,7 +59,8 @@ internal class RunCompileSnapshotTestSmokeTest :
                             compiled.exitCode shouldBe KotlinCompilation.ExitCode.OK
                         }
                         withClue("generated:\n${compiled.generatedSourceText()}") {
-                            compiled.generatedSourceText() shouldContain "myStateStoreFactory"
+                            compiled.generatedSourceText() shouldContain
+                                "fun koma.core.StoreBuilder<MyState, MyAction, Nothing>.states("
                         }
                         observed = compiled
                     },

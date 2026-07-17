@@ -24,6 +24,24 @@ internal fun Generator.Companion.validKomaStrictOptions(): Generator<KomaStrictO
         Arb.of(representatives)
     }
 
+/**
+ * [KomaStrictOptions] の**全軸の全直積**を列挙する generator。
+ *
+ * 「全ての UseCase はコンパイル可能」のような性質テスト用で、[validKomaStrictOptions] と違い
+ * **将来 option が増えても間引いてはならない** (validKomaStrictOptions が cream 形式の
+ * withRepresentativeValues に育っても、こちらは全直積を維持する契約)。
+ * option 軸が増えたらこの直積にも軸を足すこと。
+ */
+internal fun Generator.Companion.allKomaStrictOptions(): Generator<KomaStrictOptions> =
+    generator {
+        val all =
+            DeadActionSeverity.entries.map { severity ->
+                KomaStrictOptions(deadActionSeverity = severity)
+            }
+        all.forEach { options -> komaStrictOptionsLabel(options) case options }
+        Arb.of(all)
+    }
+
 /** default と異なる軸だけラベルに出す (cream の creamOptionsLabel と同じ規約)。 */
 private fun komaStrictOptionsLabel(options: KomaStrictOptions): String {
     val default = KomaStrictOptions.default

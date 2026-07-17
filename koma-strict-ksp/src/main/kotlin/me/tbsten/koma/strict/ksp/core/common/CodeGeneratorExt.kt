@@ -5,15 +5,16 @@ import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.symbol.KSName
 
 /**
- * 生成 Kotlin ファイルの唯一の書き出し口。
+ * The single writer for generated Kotlin files.
  *
- * [block] はまず in-memory buffer に対して実行され、**宣言のみ**を書くこと —
- * `package` 行と `import me.tbsten.koma.strict.*` boilerplate はここが SSoT として所有する。
- * [block] が何も書かなかった場合はファイルを開かない (空の package + import だけの
- * ファイルを出さない。cream issue #113 と同じ轍を踏まないため)。
+ * [block] is first executed against an in-memory buffer and must write **declarations only** —
+ * the `package` line and the `import me.tbsten.koma.strict.*` / `import me.tbsten.koma.strict.dsl.*`
+ * boilerplate are owned here as the SSoT (the `dsl` package holds the shared runtime plumbing
+ * the generated code builds on). If [block] writes nothing, no file is opened (never emit a file containing only
+ * a package line + imports; avoiding the same pitfall as cream issue #113).
  *
- * 呼び出し側の不変条件: [dependencies] には必ず
- * `Dependencies(aggregating = true, <source>.containingFile!!)` を渡す (incremental 対応)。
+ * Caller invariant: always pass `Dependencies(aggregating = true, <source>.containingFile!!)`
+ * as [dependencies] (for incremental processing).
  */
 internal fun CodeGenerator.createNewKotlinFile(
     dependencies: Dependencies,
@@ -41,6 +42,7 @@ internal fun CodeGenerator.createNewKotlinFile(
                 it.appendLine()
             }
             it.appendLine("import me.tbsten.koma.strict.*")
+            it.appendLine("import me.tbsten.koma.strict.dsl.*")
             it.appendLine()
             it.append(body)
         }

@@ -3,10 +3,11 @@ package me.tbsten.koma.strict.ksp.options
 import me.tbsten.koma.strict.InternalKomaStrictApi
 
 /**
- * 死にアクション (どの state もハンドルしないアクション) 診断の severity。
+ * Severity of the dead-action diagnostic (an action handled by no state).
  *
- * TODO(doc/internal/generate-strict-store-factory-dsl.md): オプション名は実装時決定 (doc 未決事項 3)。
- *   DSL 実装着手時に名前を最終確認し、必要なら rename する。
+ * TODO(doc/internal/generate-strict-store-factory-dsl.md): the option name is to be decided
+ *   at implementation time (doc open issue 3). Re-confirm the name when starting the DSL
+ *   implementation and rename if needed.
  */
 @InternalKomaStrictApi
 public enum class DeadActionSeverity {

@@ -8,7 +8,7 @@ import me.tbsten.koma.strict.ksp.InvalidKomaStrictOptionException
 
 /**
  * `Map<String, String>` → [KomaStrictOptions] の純パーステスト。KSP コンパイルは走らせない。
- * 不正値のビルド失敗 (診断) 面は koma-strict-ksp 側の OptionsDiagnosticTest (TODO) が担う。
+ * 不正値のビルド失敗 (診断) 面は koma-strict-ksp 側の OptionsDiagnosticSpec が担う。
  */
 internal class KomaStrictOptionsParsingTest :
     FreeSpec({

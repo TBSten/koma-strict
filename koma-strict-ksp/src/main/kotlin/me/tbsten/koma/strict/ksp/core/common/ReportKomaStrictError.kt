@@ -8,10 +8,12 @@ import me.tbsten.koma.strict.ksp.InvalidKomaStrictUsageException
 import me.tbsten.koma.strict.ksp.KomaStrictException
 
 /**
- * ユーザー誤用 [KomaStrictException] を positioned な COMPILATION_ERROR として報告する funnel。
- * raw throw は KSP に INTERNAL_ERROR ("processor crashed" + stack trace + 半端な生成ファイル)
- * として扱われるため禁止。呼び出し側はこの直後に必ず処理を打ち切ること (return@forEach 等)。
- * [ksNode] は診断を該当宣言に position する (option エラー等ソース位置が無い場合のみ null)。
+ * Funnel that reports a user-misuse [KomaStrictException] as a positioned COMPILATION_ERROR.
+ * Raw throws are forbidden because KSP treats them as INTERNAL_ERROR ("processor crashed" +
+ * stack trace + partially generated files). Callers must abort processing immediately after
+ * this call (return@forEach, etc.).
+ * [ksNode] positions the diagnostic at the relevant declaration (null only when there is no
+ * source location, e.g. option errors).
  */
 internal fun KSPLogger.reportKomaStrictError(
     exception: KomaStrictException,
@@ -21,8 +23,8 @@ internal fun KSPLogger.reportKomaStrictError(
 }
 
 /**
- * [KSClassDeclaration] への safe cast。失敗時は clean error を報告済みで null を返す。
- * 呼び出し側は null で unit の処理を止めること (`?: return@forEach`)。
+ * Safe cast to [KSClassDeclaration]. On failure, returns null with a clean error already reported.
+ * Callers must stop processing the unit on null (`?: return@forEach`).
  */
 context(logger: KSPLogger)
 internal fun KSAnnotated.asClassDeclarationOrReport(annotationSimpleName: String): KSClassDeclaration? =

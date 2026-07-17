@@ -6,13 +6,14 @@ import com.google.devtools.ksp.processing.Resolver
 import me.tbsten.koma.strict.ksp.options.KomaStrictOptions
 
 /**
- * 全 feature 入口が共有する per-round の処理基盤。
+ * Per-round processing infrastructure shared by all feature entry points.
  *
- * [logger] は non-null: KSP environment から常に供給されるため、生成系深部へ nullable を伝搬させない。
- * これは leaf infrastructure であり、feature / core に依存してはならない
- * (依存方向 root -> feature -> core -> util の唯一の上向き例外が feature -> ProcessContext)。
- * core 層は ProcessContext 全体ではなく、必要な capability (options / logger など) だけを
- * context parameters で受ける。
+ * [logger] is non-null: it is always supplied by the KSP environment, so nullability is not
+ * propagated into the depths of the generation pipeline.
+ * This is leaf infrastructure and must not depend on feature / core (feature -> ProcessContext
+ * is the only upward exception to the dependency direction root -> feature -> core -> util).
+ * The core layer receives only the capabilities it needs (options / logger, etc.) via
+ * context parameters, not the whole ProcessContext.
  */
 internal class ProcessContext(
     val resolver: Resolver,

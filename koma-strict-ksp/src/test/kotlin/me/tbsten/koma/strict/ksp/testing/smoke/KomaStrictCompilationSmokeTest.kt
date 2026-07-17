@@ -18,20 +18,32 @@ import java.io.File
  */
 internal class KomaStrictCompilationSmokeTest :
     FreeSpec({
-        "@StrictStore 付きの最小 source がコンパイルでき、StoreFactory stub が生成される" {
-            val result =
-                compileWithKomaStrict(
-                    """
-                    package smoke
+        val minimalStoreSpecSource =
+            """
+            package smoke
 
-                    import me.tbsten.koma.strict.StrictStore
+            import koma.core.Action
+            import koma.core.State
+            import me.tbsten.koma.strict.OnAction
+            import me.tbsten.koma.strict.StoreSpec
 
-                    @StrictStore
-                    sealed interface MyState {
-                        data object Loading : MyState
-                    }
-                    """.trimIndent(),
-                )
+            @StoreSpec
+            sealed interface MyState : State {
+                companion object
+
+                @OnAction<MyAction.Load>(nextState = [Loaded::class])
+                interface Idle : MyState { companion object }
+
+                interface Loaded : MyState { companion object }
+            }
+
+            sealed interface MyAction : Action {
+                data object Load : MyAction
+            }
+            """.trimIndent()
+
+        "@StoreSpec 付きの最小 source がコンパイルでき、states() 拡張が生成される" {
+            val result = compileWithKomaStrict(minimalStoreSpecSource)
 
             withClue(result.messages) {
                 result.exitCode shouldBe KotlinCompilation.ExitCode.OK
@@ -39,27 +51,18 @@ internal class KomaStrictCompilationSmokeTest :
 
             val generatedText = result.generatedSourceText()
             withClue("generated:\n$generatedText") {
-                generatedText shouldContain "myStateStoreFactory"
+                generatedText shouldContain "fun koma.core.StoreBuilder<MyState, MyAction, Nothing>.states("
+                generatedText shouldContain "@kotlin.jvm.JvmName(\"myStateStates\")"
             }
         }
 
         "複数 source DSL で別ファイルに分けてもコンパイルできる" {
             val result =
                 compileWithKomaStrict {
-                    "State.kt" source
-                        """
-                        package smoke.multi
-
-                        import me.tbsten.koma.strict.StrictStore
-
-                        @StrictStore
-                        sealed interface MultiState {
-                            data object Loading : MultiState
-                        }
-                        """.trimIndent()
+                    "State.kt" source minimalStoreSpecSource
                     "Other.kt" source
                         """
-                        package smoke.multi
+                        package smoke
 
                         class Other
                         """.trimIndent()
@@ -69,7 +72,7 @@ internal class KomaStrictCompilationSmokeTest :
                 result.exitCode shouldBe KotlinCompilation.ExitCode.OK
             }
             withClue("generated:\n${result.generatedSourceText()}") {
-                result.generatedSourceText() shouldContain "multiStateStoreFactory"
+                result.generatedSourceText() shouldContain "fun koma.core.StoreBuilder<MyState, MyAction, Nothing>.states("
             }
         }
 

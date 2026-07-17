@@ -6,14 +6,14 @@ import me.tbsten.koma.strict.ksp.util.lines
 import kotlin.reflect.KProperty1
 
 /**
- * KSP の arg (`koma.strict.<プロパティ名>` キー) からパースされる koma-strict のオプション。
+ * koma-strict options parsed from KSP args (`koma.strict.<property name>` keys).
  *
- * オプション追加手順 (cream 踏襲):
- * 1. data class に property を追加
- * 2. [KomaStrictOptions.Companion.default] と [KomaStrictOptions.Companion.properties] に追加
- * 3. [toKomaStrictOptions] にパース分岐を追加
- * 4. 消費側 core の context で受ける
- * 5. 診断テストを追加
+ * Steps to add an option (following the cream idiom):
+ * 1. Add a property to the data class
+ * 2. Add it to [KomaStrictOptions.Companion.default] and [KomaStrictOptions.Companion.properties]
+ * 3. Add a parsing branch to [toKomaStrictOptions]
+ * 4. Receive it in the consuming core's context
+ * 5. Add a diagnostic test
  */
 // TODO cream の CreamOptions は optionBuilder (GUI) 用に @Serializable だった。
 //   koma-strict に optionBuilder 相当を作るときに kotlinx-serialization を導入して付け直す。
@@ -27,7 +27,7 @@ public data class KomaStrictOptions(
                 deadActionSeverity = DeadActionSeverity.default,
             )
 
-        /** オプション網羅テスト・ドキュメント生成が列挙に使う (cream CreamOptions.properties 対応)。 */
+        /** Used for enumeration by option-coverage tests and doc generation (counterpart of cream's CreamOptions.properties). */
         public val properties: List<KProperty1<KomaStrictOptions, *>> =
             listOf(
                 KomaStrictOptions::deadActionSeverity,

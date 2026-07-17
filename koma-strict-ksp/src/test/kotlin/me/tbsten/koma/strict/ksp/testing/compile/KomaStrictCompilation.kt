@@ -7,8 +7,10 @@ import com.tschuchort.compiletesting.SourceFile
 import com.tschuchort.compiletesting.kspProcessorOptions
 import com.tschuchort.compiletesting.symbolProcessorProviders
 import com.tschuchort.compiletesting.useKsp2
-import me.tbsten.koma.strict.StrictStore
+import me.tbsten.koma.strict.Stay
 import me.tbsten.koma.strict.ksp.KomaStrictSymbolProcessorProvider
+import me.tbsten.koma.strict.ksp.testing.fixtures.KOMA_API_STUB_FILE_NAME
+import me.tbsten.koma.strict.ksp.testing.fixtures.komaApiStubCode
 import org.intellij.lang.annotations.Language
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import java.io.ByteArrayOutputStream
@@ -84,7 +86,9 @@ private fun runCompilation(
             if (options.isNotEmpty()) {
                 kspProcessorOptions = options.toMutableMap()
             }
-            this.sources = sources
+            // 入力が参照する koma API (koma.core.*) は hermetic なスタブとして常に一緒にコンパイルする
+            // (rc02 実物 sources と突き合わせ済み。詳細は testing/fixtures/KomaApiStub.kt)
+            this.sources = sources + SourceFile.kotlin(KOMA_API_STUB_FILE_NAME, komaApiStubCode)
             messageOutputStream = tee
             this.allWarningsAsErrors = allWarningsAsErrors
         }
@@ -97,9 +101,9 @@ private fun runCompilation(
 
 private val komaStrictCompilationClasspath: List<File> =
     listOf(
-        StrictStore::class.java, // koma-strict-runtime (placeholder annotation)
+        Stay::class.java, // koma-strict-runtime (宣言 API annotation + Stay マーカー)
         Unit::class.java, // kotlin-stdlib
-        // TODO: runtime が koma-core に依存したら koma 側のクラスも追加する
+        // TODO: runtime が koma-core に依存したら koma 側のクラスも追加する (現状は fixtures のスタブで代替)
     ).map { it.classpathRoot() }.distinct()
 
 private fun Class<*>.classpathRoot(): File {

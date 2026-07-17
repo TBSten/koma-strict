@@ -5,7 +5,7 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
-import me.tbsten.koma.strict.ksp.feature.strictStore.processStrictStore
+import me.tbsten.koma.strict.ksp.feature.storeSpec.processStoreSpec
 import me.tbsten.koma.strict.ksp.options.KomaStrictOptions
 import me.tbsten.koma.strict.ksp.options.toKomaStrictOptions
 
@@ -35,9 +35,8 @@ internal class KomaStrictSymbolProcessor(
 
         return with(processContext) {
             buildList {
-                // TODO(doc/internal/generate-strict-store-factory-dsl.md): placeholder feature。
-                //   DSL 実装時に processStoreSpec() 等へ置き換え、feature を追加するたびここに addAll を足す。
-                addAll(processStrictStore())
+                // feature を追加するたびここに addAll を足す
+                addAll(processStoreSpec())
             }
         }
     }
