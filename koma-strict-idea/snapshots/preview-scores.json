@@ -1,0 +1,126 @@
+{
+  "any-named": {
+    "score": 6,
+    "reason": "Homeハブに対角多数。resetがleave等2本と交差しやや錯綜。refresh/sync自己ループは完全。"
+  },
+  "auth": {
+    "score": 7,
+    "reason": "LoggedOut-Authenticating間で対角2本が平行近接。exitバッジ右端完全、dashed遷移も明瞭で切れ無し。"
+  },
+  "auth-canvas": {
+    "score": 8,
+    "reason": "LR配置は整然。any-state点線と各遷移が明瞭、exit注釈は枠外だが切れず。近接わずか。"
+  },
+  "auth-tb-canvas": {
+    "score": 7,
+    "reason": "TBでlogin/logout斜線が中央で交差しLoggedOut周辺やや密。onEnter/LoginFailed二重も追える。"
+  },
+  "auth-transitions": {
+    "score": 9,
+    "reason": "表として列整列・文字欠けなし。8 行全て読め、Emit 列のグレー区別も分かりやすい"
+  },
+  "feed": {
+    "score": 8,
+    "reason": "Stable複合の半透明下地とloadMore(stay)自己弧が明瞭。分岐整然、軽微な近接のみ。"
+  },
+  "feed-branch": {
+    "score": 6,
+    "reason": "左下にonEnter/LoadFailed三本の近平行斜線が密集。交差は少なめだが帯状に混む。"
+  },
+  "full-transitions-feed": {
+    "score": 9,
+    "reason": "ダーク表も列整列・行潰れなしで読みやすい。Emit のグレーはやや低コントラストだが判読可能"
+  },
+  "full-transitions-lce": {
+    "score": 9,
+    "reason": "遷移表は列見出し・縞模様・Emit の淡色表示が明瞭で一目で読める。重なりなし"
+  },
+  "indexing": {
+    "score": 8,
+    "reason": "空状態メッセージは簡潔で読みやすい。タイトル中央寄せに対し本文が左寄せで整列がやや不揃いな程度"
+  },
+  "lce": {
+    "score": 8,
+    "reason": "小規模で整然。reload/retryと二つのonEnter明瞭、交差なし一目で追える。"
+  },
+  "lce-tb": {
+    "score": 8,
+    "reason": "TB配置で縦横整然。Loading-Error間の平行斜線も分離し、ラベル明瞭。"
+  },
+  "longname": {
+    "score": 8,
+    "reason": "長名ノードは折返しで全文可読、continue/back明瞭。Done孤立は終端仕様で綺麗。"
+  },
+  "multi": {
+    "score": 8,
+    "reason": "セレクタ付きLce同等で整然。ラベル明瞭、交差なく流れが一目で追える。"
+  },
+  "oversize": {
+    "score": 3,
+    "reason": "48% 縮小バナー付きだが S6 の先の辺が右端で見切れ後続状態が不可視、縮小でラベルも微小。意図的な検証シーンだが見えている姿は判読困難"
+  },
+  "selfloops": {
+    "score": 7,
+    "reason": "上部の点線紫と灰実線の自己弧が近接気味だが色で識別可。poke含めラベル明瞭。"
+  },
+  "selfloops-canvas": {
+    "score": 7,
+    "reason": "内容同一。上部二自己弧が僅かに重なるが色分けで帰属可、finish/poke明瞭。"
+  },
+  "session": {
+    "score": 9,
+    "reason": "SignedIn複合とSignedOut外配置が水平に整然。四遷移ラベル明瞭、交差ゼロ。"
+  },
+  "session-canvas": {
+    "score": 9,
+    "reason": "単一行の流れ。SignedIn囲い枠が適切、交差ゼロ、ラベル明瞭で一目で追える。"
+  },
+  "settings": {
+    "score": 8,
+    "reason": "入れ子composite整然、save(stay)弧明瞭、openAccount/backは平行で交差せず帰属明確。軽微な近接のみ。"
+  },
+  "settings-canvas": {
+    "score": 8,
+    "reason": "本体と同構成で整然。平行な対角2辺は色/矢印/ラベルで判別可、self弧も半透明で明瞭。"
+  },
+  "setup": {
+    "score": 8,
+    "reason": "空状態の案内。見出し・説明とも欠けなく明瞭だが、見出し中央揃えに対し説明文が左端揃えで整列に軽微な不揃い"
+  },
+  "tabs": {
+    "score": 8,
+    "reason": "any stateからの3本fan-out整然。selectTabラベル3段がやや近接だが判読可、Searchの2self弧も判別可。"
+  },
+  "transitions-feed": {
+    "score": 9,
+    "reason": "4 列の整列・交互行背景で行追跡容易、文字欠け・見切れなし。Emit のグレー表示も判別可能"
+  },
+  "transitions-lce": {
+    "score": 9,
+    "reason": "4 行の遷移表が列整列・縞模様で明瞭。Emit 列の LoadFailed も判読でき、欠けや潰れなし"
+  },
+  "transitions-narrow": {
+    "score": 4,
+    "reason": "意図的な狭幅検証だが To 列が右端で見切れ、Emit 列は完全に不可視。Trigger/From は読める"
+  },
+  "unreachable": {
+    "score": 9,
+    "reason": "交差なく明快。Broken警告色で強調、ラベル欠けや端切れなし、流れが一目瞭然。"
+  },
+  "unreachable-transitions": {
+    "score": 9,
+    "reason": "3 行の表が整然。到達不能系の行が警告色で明確に区別され、列の欠けなし"
+  },
+  "wizard": {
+    "score": 8,
+    "reason": "横一列の線形配置で整然、右端Done切れなし。self弧・back辺明瞭、同名ラベルも別辺に帰属明確。"
+  },
+  "wizard-canvas": {
+    "score": 8,
+    "reason": "canvasのみで同じ線形配置。交差なく端切れなし、self弧とValidationFailedラベル明瞭。"
+  },
+  "zoom": {
+    "score": 9,
+    "reason": "余白広く明快。対角の平行2辺は青/灰と個別ラベルで判別容易、上部辺も整然。"
+  }
+}

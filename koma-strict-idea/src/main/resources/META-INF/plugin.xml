@@ -1,0 +1,37 @@
+<idea-plugin>
+    <id>me.tbsten.koma.strict.idea</id>
+    <name>Koma Strict</name>
+    <vendor>tbsten</vendor>
+
+    <description><![CDATA[
+        Koma Strict IDE plugin. Opens a Jewel (Compose) tool window on the right dock that shows the
+        live @StoreSpec state diagram and its transition table, following the editor selection and
+        jumping to a state declaration when you click a node or table row.
+    ]]></description>
+
+    <!-- since/until build は build.gradle.kts の pluginConfiguration.ideaVersion から注入される -->
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.kotlin</depends>
+
+    <!-- 261 同梱の Jewel/Compose モジュールをランタイム依存として宣言する (v2 module dependency)。
+         build.gradle.kts の bundledModule(...) と対を成し、plugin classloader から解決させる。 -->
+    <dependencies>
+        <module name="intellij.platform.jewel.foundation"/>
+        <module name="intellij.platform.jewel.ui"/>
+        <module name="intellij.platform.jewel.ideLafBridge"/>
+        <module name="intellij.libraries.compose.runtime.desktop"/>
+        <module name="intellij.libraries.compose.foundation.desktop"/>
+        <module name="intellij.libraries.skiko"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <supportsKotlinPluginMode supportsK2="true"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Koma Strict"
+                    anchor="right"
+                    factoryClass="me.tbsten.koma.strict.idea.KomaStrictToolWindowFactory"/>
+    </extensions>
+</idea-plugin>
