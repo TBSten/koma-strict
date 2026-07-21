@@ -1,5 +1,6 @@
 package me.tbsten.koma.strict
 
+import koma.core.Event
 import kotlin.reflect.KClass
 
 /**
@@ -27,5 +28,5 @@ import kotlin.reflect.KClass
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 public annotation class OnExit(
-    val emit: Array<KClass<*>> = [],
+    val emit: Array<KClass<out Event>> = [],
 )

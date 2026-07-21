@@ -1,8 +1,15 @@
 package me.tbsten.koma.strict
 
+import koma.core.State
+
 /**
  * Marker object placed in the elements of [OnAction.nextState] / [OnEnter.nextState] /
  * [OnRecover.nextState] to declare that "staying in the current state is also allowed".
+ *
+ * [Stay] implements [koma.core.State] solely so that it satisfies the
+ * `Array<KClass<out State>>` bound of the `nextState` parameters — non-state classes are
+ * rejected by the type system before KSP runs. It is never a real state: it is never
+ * instantiated as a store state and never appears in generated code.
  *
  * Action capability rules (the `nextState` list determines the handler's full capability):
  *
@@ -17,4 +24,4 @@ package me.tbsten.koma.strict
  * Note that under koma's default policy, pending actions are discarded only on a transition
  * to a different class; they survive both staying and self-transitions.
  */
-public object Stay
+public object Stay : State

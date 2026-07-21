@@ -37,7 +37,8 @@
 ```
 
 モジュール構成(想定・詳細未確定): `koma-strict-runtime`(annotation + `Stay` マーカーのみ。
-koma 依存可 — backend 中立制約は撤廃済み)/ `koma-strict-ksp`(processor)/
+`koma-core` に api 依存 — backend 中立制約は撤廃済み。`Stay : koma.core.State` と
+`nextState: Array<KClass<out State>>` の境界のため)/ `koma-strict-ksp`(processor)/
 図生成系は [generate-state-diagrams.md](./generate-state-diagrams.md) 参照。
 
 ## 宣言 API (annotation)
@@ -52,7 +53,7 @@ package は全て **`me.tbsten.koma.strict` 直下**。
 | `@OnRecover<E : Exception>(nextState, emit)` | state / 中間 sealed / root | 例外 E 捕捉時の handler を宣言。repeatable。`@OnAction<A>` と相似形(Scope に `error: E`)。CancellationException / Error 系は捕捉対象外(koma の recover と同じ)。handler param 名は `recover{Exception}`(仮確定) |
 | `@OnAction<A>(nextState, emit)` | leaf / 中間 sealed / root | (state, action) ペアの handler を宣言。repeatable。中間・root に付けると scope 共有アクション(= default ブロック)になる |
 | `@DefaultName(name)` | root / 中間 sealed | default ブロックの引数名を変更(デフォルト `"default"`)。leaf 名との衝突回避用 |
-| `Stay`(マーカー object) | `nextState` の要素 | 「現状維持も可」の宣言。空リストは `[Stay::class]` の糖衣 |
+| `Stay`(マーカー object) | `nextState` の要素 | 「現状維持も可」の宣言。空リストは `[Stay::class]` の糖衣。`koma.core.State` を実装する(`nextState: Array<KClass<out State>>` の境界を満たすための sentinel。実 state にはならず生成コードにも現れない) |
 
 - `@OnAction<A>` の型引数はマーカー専用(generic annotation は Kotlin 2.2+ でコンパイル可を実機検証済み。
   型引数はバイトコードに残らず source/metadata のみ = KSP/FIR のソースレベル解析専用)
@@ -402,6 +403,8 @@ named-param 形式のコンパイル時網羅が正のまま併存し、builder 
 
 - `@OnAction` のアクションが actions 階層の subtype か / `emit` の event が events 階層の subtype か
 - `nextState` の要素が同一 sealed 階層の**具象 leaf** か `Stay::class` か
+  (State 非実装型はそもそも `nextState: Array<KClass<out State>>` の境界に合わずコンパイルエラー =
+  KSP 診断が担当するのは「State だが階層外 / 中間 sealed」のケース)
 - 同一 (state, action) ペアへの重複 `@OnAction` はエラー / 祖先・子孫の重複宣言はエラー
 - `@OnRecover` の型引数が `Exception` の subtype か / 同一 state への同一例外型の重複はエラー
   (継承関係のある複数宣言の扱いはスパイク (d) 後に確定)

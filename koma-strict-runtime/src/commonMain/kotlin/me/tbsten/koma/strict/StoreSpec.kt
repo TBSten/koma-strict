@@ -1,5 +1,8 @@
 package me.tbsten.koma.strict
 
+import koma.core.Action
+import koma.core.Event
+import koma.core.State
 import kotlin.reflect.KClass
 
 /**
@@ -29,7 +32,7 @@ import kotlin.reflect.KClass
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 public annotation class StoreSpec(
-    val actions: KClass<*> = Nothing::class,
-    val events: KClass<*> = Nothing::class,
-    val initial: Array<KClass<*>> = [],
+    val actions: KClass<out Action> = Nothing::class,
+    val events: KClass<out Event> = Nothing::class,
+    val initial: Array<KClass<out State>> = [],
 )

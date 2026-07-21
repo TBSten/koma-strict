@@ -96,11 +96,11 @@ package はすべて `me.tbsten.koma.strict` 直下。
 | `@OnAction<A>(nextState, emit)` | leaf / 中間 / root | (state, action) handler。中間・root に付けると scope 共有アクション |
 | `@OnRecover<E : Exception>(nextState, emit)` | state / 中間 / root | 例外 E 捕捉時の handler(`@OnAction` と相似形。Scope に `error: E`) |
 | `@DefaultName(name)` | root / 中間 | 共有ブロックの引数名を変更(デフォルト `"default"`) |
-| `Stay` | `nextState` の要素 | 「現状維持も可」の宣言 |
+| `Stay` | `nextState` の要素 | 「現状維持も可」の宣言(`koma.core.State` を実装する sentinel ── `nextState` の型境界を満たすためだけの存在で、実 state にはならない) |
 
 **アクション能力ルール**: `nextState` リストがそのハンドラの全能力を決める ──
 `[]`(省略)= `stayState()` のみ / `[X::class]` = `nextState.toX()` のみ / `[Stay::class, X::class]` = 両方(条件分岐)。
-遷移先は具象 leaf のみ(中間 sealed 型は KSP エラー)。
+遷移先は具象 leaf のみ(`nextState: Array<KClass<out State>>` のため State 非実装型は型エラー、中間 sealed 型は KSP エラー)。
 
 ## 網羅性はどう強制されるか(4+1 層)
 
@@ -133,7 +133,7 @@ Kotlin でコンパイル時に「全部書かせる」道具は **必須引数*
 
 | モジュール | 中身 | publish |
 |---|---|---|
-| `koma-strict-runtime` | annotation + `Stay` + `@KomaStrictDsl` + 生成コード共通機構(`dsl/`) | ✓ |
+| `koma-strict-runtime` | annotation + `Stay` + `@KomaStrictDsl` + 生成コード共通機構(`dsl/`)。`koma-core` に api 依存 | ✓ |
 | `koma-strict-ksp` | KSP processor(発見 → 検証 → 生成) | ✓ |
 | `koma-strict-ksp:shared` | KSP 非依存の StoreSpec model / 命名 / codegen | ✓ |
 | `integrationTest` | 実物 koma-core に KSP を適用した E2E 検証 | ✗ |

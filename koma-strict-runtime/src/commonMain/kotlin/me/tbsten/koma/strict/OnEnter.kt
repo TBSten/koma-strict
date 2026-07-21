@@ -1,5 +1,7 @@
 package me.tbsten.koma.strict
 
+import koma.core.Event
+import koma.core.State
 import kotlin.reflect.KClass
 
 /**
@@ -19,7 +21,8 @@ import kotlin.reflect.KClass
  *   - `[Stay::class, X::class]`: either `stayState()` or `nextState.toX()` (conditional transition)
  *
  *   Elements must be concrete leaves of the same sealed hierarchy or [Stay]::class
- *   (intermediate sealed types are a KSP error).
+ *   (intermediate sealed types are a KSP error; non-[State] classes are rejected by the
+ *   `KClass<out State>` bound before KSP runs).
  * @property emit Whitelist of events the handler may emit.
  *   For each declared event, an `emit{Event}(...)` function is generated on the handler scope.
  *   Undeclared events have no function at all.
@@ -27,6 +30,6 @@ import kotlin.reflect.KClass
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 public annotation class OnEnter(
-    val nextState: Array<KClass<*>> = [],
-    val emit: Array<KClass<*>> = [],
+    val nextState: Array<KClass<out State>> = [],
+    val emit: Array<KClass<out Event>> = [],
 )
