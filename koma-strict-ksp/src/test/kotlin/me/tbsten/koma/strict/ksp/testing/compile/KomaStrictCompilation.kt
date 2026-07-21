@@ -7,7 +7,7 @@ import com.tschuchort.compiletesting.SourceFile
 import com.tschuchort.compiletesting.kspProcessorOptions
 import com.tschuchort.compiletesting.symbolProcessorProviders
 import com.tschuchort.compiletesting.useKsp2
-import me.tbsten.koma.strict.Stay
+import me.tbsten.koma.strict.StoreSpec
 import me.tbsten.koma.strict.ksp.KomaStrictSymbolProcessorProvider
 import me.tbsten.koma.strict.ksp.testing.fixtures.KOMA_API_STUB_FILE_NAME
 import me.tbsten.koma.strict.ksp.testing.fixtures.komaApiStubCode
@@ -101,9 +101,14 @@ private fun runCompilation(
 
 private val komaStrictCompilationClasspath: List<File> =
     listOf(
-        Stay::class.java, // koma-strict-runtime (宣言 API annotation + Stay マーカー)
+        // classpath root の取得は StoreSpec で行う (annotation class は class load しても安全)。
+        // Stay::class は使わない: Stay : koma.core.State (JVM 21 bytecode) のため、
+        // JDK 17 の test JVM で class load すると UnsupportedClassVersionError になる
+        StoreSpec::class.java, // koma-strict-runtime (宣言 API annotation + Stay マーカー)
         Unit::class.java, // kotlin-stdlib
-        // TODO: runtime が koma-core に依存したら koma 側のクラスも追加する (現状は fixtures のスタブで代替)
+        // koma-core の実物 jar は意図的に足さない (hermetic 維持)。runtime jar 内の
+        // `Stay : koma.core.State` の supertype は同時コンパイルされるスタブ source
+        // (fixtures/KomaApiStub.kt の koma.core.State) が FQN 一致で解決する
     ).map { it.classpathRoot() }.distinct()
 
 private fun Class<*>.classpathRoot(): File {

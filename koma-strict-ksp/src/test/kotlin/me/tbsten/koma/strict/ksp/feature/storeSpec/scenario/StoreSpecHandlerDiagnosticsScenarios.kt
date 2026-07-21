@@ -59,7 +59,9 @@ internal fun storeSpecHandlerDiagnosticsScenarios(): Generator<SnapshotScenario>
                         import me.tbsten.koma.strict.OnAction
                         import me.tbsten.koma.strict.StoreSpec
 
-                        class Foreign
+                        // State は実装している (nextState の KClass<out State> 境界は満たす) が
+                        // FtState 階層の外 → KSP 診断で検出されるケース
+                        class Foreign : State
 
                         @StoreSpec
                         sealed interface FtState : State {

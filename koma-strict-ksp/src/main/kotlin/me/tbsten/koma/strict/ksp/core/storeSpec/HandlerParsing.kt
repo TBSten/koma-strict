@@ -9,7 +9,6 @@ import me.tbsten.koma.strict.OnAction
 import me.tbsten.koma.strict.OnEnter
 import me.tbsten.koma.strict.OnExit
 import me.tbsten.koma.strict.OnRecover
-import me.tbsten.koma.strict.Stay
 import me.tbsten.koma.strict.ksp.core.common.fullName
 import me.tbsten.koma.strict.ksp.model.ActionHandler
 import me.tbsten.koma.strict.ksp.model.EnterHandler
@@ -24,7 +23,11 @@ private val onExitFqn = OnExit::class.fullName
 private val onActionFqn = OnAction::class.fullName
 private val onRecoverFqn = OnRecover::class.fullName
 private val defaultNameFqn = DefaultName::class.fullName
-private val stayFqn = Stay::class.fullName
+
+// Stay だけは `Stay::class` で参照しない: Stay は koma.core.State (JVM 21 bytecode) を実装するため、
+// processor JVM (JDK 17 の build もサポート) で class load すると UnsupportedClassVersionError になる。
+// FQN 文字列で判定する (runtime 側の宣言との一致は koma-strict-ksp の snapshot テストが保証する)
+private const val stayFqn = "me.tbsten.koma.strict.Stay"
 
 /** Handler-annotation parsing result for one node (model values + KS references for validation). */
 internal class ParsedNodeHandlers(
