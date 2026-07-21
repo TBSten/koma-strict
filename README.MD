@@ -1,5 +1,9 @@
 # koma-strict
 
+[![Maven Central](https://img.shields.io/maven-central/v/me.tbsten.koma.strict/koma-strict-runtime.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/me.tbsten.koma.strict/koma-strict-runtime)
+[![CI](https://github.com/TBSten/koma-strict/actions/workflows/gradle.yml/badge.svg)](https://github.com/TBSten/koma-strict/actions/workflows/gradle.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **[koma](https://github.com/koma-kt/koma)(KMP の MVI 状態管理ライブラリ)向けの KSP プラグイン。**
 
 State 定義から Store を typesafe に組み上げる DSL を自動生成する実験プロジェクト。 
