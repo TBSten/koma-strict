@@ -51,12 +51,17 @@ internal fun reportGeneratedTypeNameCollisions(specs: List<Pair<KSClassDeclarati
             if (duplicated.isEmpty()) return@forEach
 
             duplicated.keys.sorted().forEach { name ->
+                // KSP のシンボル処理順は OS/FS で変わる (macOS ローカル vs Linux CI) ため、error を付ける
+                // ノードと "(by ...)" の列挙順を fullName で安定ソートし決定性を確保する
+                // (怠ると診断 snapshot の golden が環境ごとに割れる)。
                 val involved = duplicated.getValue(name)
+                    .distinctBy { it.fullName }
+                    .sortedBy { it.fullName }
                 collided += involved
                 diagnostics.error(
                     message =
                         "Generated declaration '$name' in package '$packageName' is generated more than once " +
-                            "(by ${involved.map { "'${it.fullName}'" }.distinct().joinToString(" and ")}). " +
+                            "(by ${involved.joinToString(" and ") { "'${it.fullName}'" }}). " +
                             "Generated helper type names are derived from the state path without the root, " +
                             "and the store factory function name from the root name (with a trailing 'State' " +
                             "stripped), so nearby names collide within one package.",
