@@ -102,6 +102,11 @@ package はすべて `me.tbsten.koma.strict` 直下。
 `[]`(省略)= `stayState()` のみ / `[X::class]` = `nextState.toX()` のみ / `[Stay::class, X::class]` = 両方(条件分岐)。
 遷移先は具象 leaf のみ(`nextState: Array<KClass<out State>>` のため State 非実装型は型エラー、中間 sealed 型は KSP エラー)。
 
+
+## IDE Plugin
+
+<video src="./doc/sample/ide-plugin.mp4" />
+
 ## 網羅性はどう強制されるか(4+1 層)
 
 Kotlin でコンパイル時に「全部書かせる」道具は **必須引数** と **abstract メンバー** の 2 つだけ。そこで:
