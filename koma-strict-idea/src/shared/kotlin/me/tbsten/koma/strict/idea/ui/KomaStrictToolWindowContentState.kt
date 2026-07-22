@@ -8,6 +8,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
+import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
+import me.tbsten.koma.strict.idea.ui.diagram.SelectionState
+import me.tbsten.koma.strict.idea.ui.diagram.ZoomState
 
 /**
  * All interactive state of [KomaStrictToolWindowContent], split into semantic sub-holders

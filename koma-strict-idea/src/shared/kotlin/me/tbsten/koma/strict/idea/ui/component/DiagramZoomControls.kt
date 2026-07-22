@@ -11,8 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import me.tbsten.koma.strict.idea.ui.DiagramColors
-import me.tbsten.koma.strict.idea.ui.ZoomState
+import me.tbsten.koma.strict.idea.ui.diagram.DiagramColors
+import me.tbsten.koma.strict.idea.ui.diagram.ZoomState
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
 import org.jetbrains.jewel.ui.component.Text

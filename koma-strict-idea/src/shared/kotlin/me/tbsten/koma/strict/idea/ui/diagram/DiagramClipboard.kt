@@ -1,4 +1,4 @@
-package me.tbsten.koma.strict.idea.ui
+package me.tbsten.koma.strict.idea.ui.diagram
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -51,7 +51,7 @@ internal fun copyDiagramImageToClipboard(
  * versa). A pathological layout bigger than [MAX_IMAGE_EXTENT_PX] px on either axis is scaled down to
  * fit (same spirit as [fitDiagram]) instead of allocating an absurd bitmap.
  */
-internal fun renderDiagramImage(
+private fun renderDiagramImage(
     graph: DiagramGraph,
     layout: GraphLayout,
     colors: DiagramColors,

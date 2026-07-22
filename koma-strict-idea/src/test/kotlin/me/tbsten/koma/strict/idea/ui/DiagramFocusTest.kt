@@ -17,6 +17,10 @@ import me.tbsten.koma.strict.idea.model.LeafState
 import me.tbsten.koma.strict.idea.model.RootState
 import me.tbsten.koma.strict.idea.model.StateId
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
+import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
+import me.tbsten.koma.strict.idea.ui.diagram.focusFrom
+import me.tbsten.koma.strict.idea.ui.diagram.hitElement
+import me.tbsten.koma.strict.idea.ui.diagram.nextSelection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

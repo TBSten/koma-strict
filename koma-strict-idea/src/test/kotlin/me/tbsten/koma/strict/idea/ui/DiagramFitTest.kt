@@ -12,6 +12,9 @@ import me.tbsten.koma.strict.idea.model.Reachability
 import me.tbsten.koma.strict.idea.model.RootState
 import me.tbsten.koma.strict.idea.model.StateId
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
+import me.tbsten.koma.strict.idea.ui.diagram.DiagramFit
+import me.tbsten.koma.strict.idea.ui.diagram.MAX_CANVAS_EXTENT
+import me.tbsten.koma.strict.idea.ui.diagram.fitDiagram
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

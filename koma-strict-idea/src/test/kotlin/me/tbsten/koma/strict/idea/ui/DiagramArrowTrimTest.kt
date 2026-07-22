@@ -1,6 +1,8 @@
 package me.tbsten.koma.strict.idea.ui
 
 import androidx.compose.ui.geometry.Offset
+import me.tbsten.koma.strict.idea.ui.diagram.trimCubicEnd
+import me.tbsten.koma.strict.idea.ui.diagram.trimPolylineEnd
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

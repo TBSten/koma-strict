@@ -8,6 +8,10 @@ import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
 import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.Rect
+import me.tbsten.koma.strict.idea.ui.diagram.SelfLoopArc
+import me.tbsten.koma.strict.idea.ui.diagram.SelfLoopFace
+import me.tbsten.koma.strict.idea.ui.diagram.selfLoopArc
+import me.tbsten.koma.strict.idea.ui.diagram.selfLoopFace
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue

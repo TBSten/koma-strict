@@ -1,4 +1,4 @@
-package me.tbsten.koma.strict.idea.ui
+package me.tbsten.koma.strict.idea.ui.diagram
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size

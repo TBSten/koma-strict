@@ -11,6 +11,7 @@ import me.tbsten.koma.strict.idea.model.RootState
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StateId
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
+import me.tbsten.koma.strict.idea.ui.diagram.hitSource
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test

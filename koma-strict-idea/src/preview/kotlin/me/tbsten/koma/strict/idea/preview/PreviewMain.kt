@@ -17,12 +17,12 @@ import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.LayoutConfig
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
-import me.tbsten.koma.strict.idea.ui.DiagramSelection
 import me.tbsten.koma.strict.idea.ui.KomaStrictToolWindowContent
-import me.tbsten.koma.strict.idea.ui.StoreDiagram
-import me.tbsten.koma.strict.idea.ui.rememberDiagramColors
-import me.tbsten.koma.strict.idea.ui.rememberSelectionState
-import me.tbsten.koma.strict.idea.ui.rememberZoomState
+import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
+import me.tbsten.koma.strict.idea.ui.diagram.StoreDiagram
+import me.tbsten.koma.strict.idea.ui.diagram.rememberDiagramColors
+import me.tbsten.koma.strict.idea.ui.diagram.rememberSelectionState
+import me.tbsten.koma.strict.idea.ui.diagram.rememberZoomState
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.skia.EncodedImageFormat

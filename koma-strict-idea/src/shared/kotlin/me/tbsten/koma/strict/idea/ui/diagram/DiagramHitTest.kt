@@ -1,4 +1,4 @@
-package me.tbsten.koma.strict.idea.ui
+package me.tbsten.koma.strict.idea.ui.diagram
 
 import me.tbsten.koma.strict.idea.ir.AnyStateNode
 import me.tbsten.koma.strict.idea.ir.DiagramGraph

@@ -14,7 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import me.tbsten.koma.strict.idea.ui.DiagramColors
+import me.tbsten.koma.strict.idea.ui.diagram.DiagramColors
 import org.jetbrains.jewel.ui.component.Text
 import kotlin.math.roundToInt
 

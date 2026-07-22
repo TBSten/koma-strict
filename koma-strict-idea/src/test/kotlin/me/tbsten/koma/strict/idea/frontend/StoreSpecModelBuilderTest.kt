@@ -13,7 +13,7 @@ import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StateId
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import me.tbsten.koma.strict.idea.model.findById
-import me.tbsten.koma.strict.idea.ui.hitSource
+import me.tbsten.koma.strict.idea.ui.diagram.hitSource
 import me.tbsten.koma.strict.idea.model.transitionRows
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt

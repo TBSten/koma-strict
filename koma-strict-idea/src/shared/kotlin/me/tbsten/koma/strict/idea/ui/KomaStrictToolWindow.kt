@@ -27,6 +27,11 @@ import me.tbsten.koma.strict.idea.ui.component.IndexingGuidance
 import me.tbsten.koma.strict.idea.ui.component.RenderErrorGuidance
 import me.tbsten.koma.strict.idea.ui.component.SetupGuidance
 import me.tbsten.koma.strict.idea.ui.component.UnresolvedBanner
+import me.tbsten.koma.strict.idea.ui.diagram.DiagramColors
+import me.tbsten.koma.strict.idea.ui.diagram.StoreDiagram
+import me.tbsten.koma.strict.idea.ui.diagram.copyDiagramImageToClipboard
+import me.tbsten.koma.strict.idea.ui.diagram.focusFrom
+import me.tbsten.koma.strict.idea.ui.diagram.rememberDiagramColors
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import kotlin.coroutines.cancellation.CancellationException
 
