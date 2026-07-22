@@ -3,7 +3,6 @@ package me.tbsten.koma.strict.idea.frontend
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.psi.SmartPointerManager
-import com.intellij.psi.util.PsiTreeUtil
 import me.tbsten.koma.strict.idea.model.DiagramStateNode
 import me.tbsten.koma.strict.idea.model.GroupState
 import me.tbsten.koma.strict.idea.model.LeafState
@@ -21,6 +20,7 @@ import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
 import org.jetbrains.kotlin.psi.KtUserType
+import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -43,14 +43,15 @@ object StoreSpecModelBuilder {
 
     /**
      * Every `@StoreSpec`-annotated declaration in the file (top-level or nested), confirmed by the
-     * fully-qualified annotation [KomaStrictFq.STORE_SPEC] via the Analysis API. A cheap PSI pre-filter
-     * (declarations that carry any annotation) keeps a file with no annotations from ever opening an
-     * analysis session; the classId check then detects alias-imported `@StoreSpec` and rejects a
-     * foreign same-name `StoreSpec`.
+     * fully-qualified annotation [KomaStrictFq.STORE_SPEC] via the Analysis API. Enumerating the
+     * candidate declarations is unavoidably PSI (the Analysis API resolves symbols but does not offer
+     * a symbol-only "all nested classes in a file" traversal), so a cheap PSI pre-filter — declarations
+     * that carry any annotation — keeps a file with no annotations from ever opening an analysis
+     * session; the session then confirms each via [isStoreSpec] (per-entry `classId` resolution, so an
+     * alias-imported `@Spec` is accepted and a foreign same-name `StoreSpec` is rejected).
      */
     fun findStoreSpecClasses(file: KtFile): List<KtClassOrObject> {
-        val candidates = PsiTreeUtil.findChildrenOfType(file, KtClassOrObject::class.java)
-            .filter { it.annotationEntries.isNotEmpty() }
+        val candidates = file.collectDescendantsOfType<KtClassOrObject> { it.annotationEntries.isNotEmpty() }
         if (candidates.isEmpty()) return emptyList()
         return analyze(file) {
             candidates.filter { candidate -> isStoreSpec(candidate) }
@@ -58,11 +59,14 @@ object StoreSpecModelBuilder {
     }
 
     /**
-     * True when [candidate] carries the koma-strict `@StoreSpec`. A resolvable annotation is matched
+     * True when [candidate] carries the koma-strict `@StoreSpec`. Each annotation is resolved through
+     * the [KaSession] (`entry.typeReference?.type`): one that resolves to a class type is matched
      * strictly by [KomaStrictFq.STORE_SPEC] — so an alias-imported `@Spec` is accepted and a foreign
-     * same-name `StoreSpec` is rejected. An annotation whose type cannot be resolved (koma-strict not
-     * yet on the classpath / half-typed code) falls back to the source shortName so the tool window
-     * still degrades gracefully instead of treating the file as having no store.
+     * same-name `StoreSpec` is rejected. Only an annotation that does **not** resolve to a class type
+     * (an error type — koma-strict not yet on the classpath / half-typed code) falls back to the source
+     * shortName, so the tool window still degrades gracefully; a resolvable foreign annotation never
+     * reaches that fallback. (Per-entry resolution is deliberate: `symbol.annotations` cannot tell an
+     * unresolvable annotation apart from a resolved one, since an error annotation keeps a bogus classId.)
      */
     private fun KaSession.isStoreSpec(candidate: KtClassOrObject): Boolean =
         candidate.annotationEntries.any { entry ->
