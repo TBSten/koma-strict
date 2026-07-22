@@ -23,7 +23,7 @@ import me.tbsten.koma.strict.idea.frontend.PsiSourceAnchor
 import me.tbsten.koma.strict.idea.frontend.StoreSpecModelBuilder
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
-import org.jetbrains.kotlin.psi.KtClassOrObject
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import java.util.concurrent.atomic.AtomicLong
 
@@ -193,16 +193,17 @@ internal class KomaStrictToolWindowController(
     }
 
     /**
-     * Jumps to a state declaration from a diagram node / transition-table row click (`ide.md` v1
-     * click-to-declaration). Resolves the [PsiSourceAnchor]'s smart pointer and navigates via the
-     * PSI element's `Navigatable` (the target `NavigationUtil` ultimately drives). Must run on the EDT.
+     * Jumps to a declaration from a diagram click (`ide.md` v1 click-to-declaration): a state
+     * declaration for a node / composite box, or a trigger's `@On…` annotation site for a transition
+     * arrow (`ide-4.md`). Resolves the [PsiSourceAnchor]'s smart pointer and navigates via the PSI
+     * element's `Navigatable` (the target `NavigationUtil` ultimately drives). Must run on the EDT.
      */
     fun navigate(anchor: SourceAnchor) {
         // PSI 解決 (SmartPsiElementPointer.element / canNavigate) は read action 内で行い、
         // 実際の navigate(true) だけを read action の外 (EDT) で呼ぶ (261 系の堅牢パターン)。
         ReadAction
-            .computeBlocking<KtClassOrObject?, RuntimeException> {
-                (anchor as? PsiSourceAnchor)?.declaration?.takeIf { it.canNavigate() }
+            .computeBlocking<KtElement?, RuntimeException> {
+                (anchor as? PsiSourceAnchor)?.element?.takeIf { it.canNavigate() }
             }?.navigate(true)
     }
 

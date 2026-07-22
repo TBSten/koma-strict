@@ -33,6 +33,14 @@ sealed interface DiagramTrigger {
      * partially unresolved (see [DiagramStateNode.hasUnresolvedDeclarations]).
      */
     val unresolvedTargets: List<String>
+
+    /**
+     * Back-reference to the trigger's own declaration — the `@OnEnter` / `@OnAction` / `@OnRecover`
+     * annotation application — for click-to-declaration from a transition arrow (`ide-4.md`). Distinct
+     * from [DiagramStateNode.source] (the state *declaration*): a transition has no declaration of its
+     * own, so its anchor is the annotation site. Set by the Analysis-API frontend; null in pure tests.
+     */
+    val source: SourceAnchor?
 }
 
 /** True when this trigger declares any value the frontend could not resolve (foreign / error type). */
@@ -45,6 +53,7 @@ data class EnterTrigger(
     override val stay: Boolean = false,
     override val emits: List<String> = emptyList(),
     override val unresolvedTargets: List<String> = emptyList(),
+    override val source: SourceAnchor? = null,
 ) : DiagramTrigger
 
 /**
@@ -59,6 +68,7 @@ data class ActionTrigger(
     override val stay: Boolean = false,
     override val emits: List<String> = emptyList(),
     override val unresolvedTargets: List<String> = emptyList(),
+    override val source: SourceAnchor? = null,
 ) : DiagramTrigger
 
 /**
@@ -72,6 +82,7 @@ data class RecoverTrigger(
     override val stay: Boolean = false,
     override val emits: List<String> = emptyList(),
     override val unresolvedTargets: List<String> = emptyList(),
+    override val source: SourceAnchor? = null,
 ) : DiagramTrigger
 
 /**

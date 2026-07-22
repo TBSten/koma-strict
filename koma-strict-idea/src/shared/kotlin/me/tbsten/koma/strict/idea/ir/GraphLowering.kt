@@ -123,6 +123,7 @@ object GraphLowering {
                                 kind = kindOf(trigger),
                                 trigger = triggerToken(trigger),
                                 emits = trigger.emits,
+                                source = trigger.source,
                             )
                         }
                     }
@@ -171,10 +172,10 @@ object GraphLowering {
         for (target in trigger.targets) {
             // toId は leaf の NodeId.State、または group の NodeId.Composite (= composite box id)。
             val toId = targetNode(target) ?: continue
-            result += GraphEdge(fromId, toId, kind, token, trigger.emits, stay = false)
+            result += GraphEdge(fromId, toId, kind, token, trigger.emits, stay = false, source = trigger.source)
         }
         if (includeStay && trigger.stay) {
-            result += GraphEdge(fromId, fromId, kind, token, trigger.emits, stay = true)
+            result += GraphEdge(fromId, fromId, kind, token, trigger.emits, stay = true, source = trigger.source)
         }
         return result
     }

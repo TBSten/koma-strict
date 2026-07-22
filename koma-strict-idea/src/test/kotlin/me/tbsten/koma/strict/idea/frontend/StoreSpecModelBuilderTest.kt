@@ -17,6 +17,7 @@ import me.tbsten.koma.strict.idea.ui.diagram.hitSource
 import me.tbsten.koma.strict.idea.model.transitionRows
 import org.jetbrains.kotlin.analysis.api.permissions.KaAllowAnalysisOnEdt
 import org.jetbrains.kotlin.analysis.api.permissions.allowAnalysisOnEdt
+import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 
@@ -97,6 +98,37 @@ internal class StoreSpecModelBuilderTest : BasePlatformTestCase() {
             root.declarations.filterIsInstance<KtClass>().first { it.name == "Loading" }
         }
         assertSame("pointer は fixture の Loading 宣言そのものを指す", expected, decl)
+    }
+
+    // Transition の source は遷移を定義する @On... 注釈 (State 宣言ではない) を指し、lowering 後の
+    // GraphEdge へ伝播する = 矢印クリックで遷移定義へ飛べる (ide-4.md)。
+    fun testTransitionSourcePointsToAnnotationAndPropagatesToEdge() {
+        val (model, _) = buildFrom(LCE_SRC)
+
+        // leaf Loading の @OnEnter トリガ。source は注釈エントリで、State 宣言 source とは別物。
+        val loading = model.leaf(StateId("Loading"))!!
+        val enter = loading.enter!!
+        assertNotNull("@OnEnter トリガに source が付く", enter.source)
+        assertNotSame("トリガ source は State 宣言 source とは別物", loading.source, enter.source)
+
+        val enterHead = runReadActionBlocking {
+            val el = (enter.source as PsiSourceAnchor).element
+            assertTrue("トリガ source は @OnEnter 注釈エントリを指す", el is KtAnnotationEntry)
+            (el as KtAnnotationEntry).text.substringBefore('(')
+        }
+        assertEquals("@OnEnter", enterHead)
+
+        // @OnAction<LceAction.Reload> も同様に注釈サイトを指す。
+        val content = model.leaf(StateId("Content"))!!
+        val actionHead = runReadActionBlocking {
+            (content.actions.single().source as PsiSourceAnchor).element?.let { (it as KtAnnotationEntry).text }
+        }
+        assertTrue("@OnAction サイトを指す", actionHead!!.startsWith("@OnAction<LceAction.Reload>"))
+
+        // lowering: Loading -> Content / Error の enter エッジがトリガ source をそのまま運ぶ。
+        val graph = GraphLowering.lower(model)
+        val enterEdge = graph.edges.first { it.fromId == NodeId.state("Loading") && it.toId == NodeId.state("Content") }
+        assertSame("enter エッジは @OnEnter トリガの source を運ぶ", enter.source, enterEdge.source)
     }
 
     // root 共有 recover と leaf の exit が AA で解決され、model / IR に落ちる (samples §5)。

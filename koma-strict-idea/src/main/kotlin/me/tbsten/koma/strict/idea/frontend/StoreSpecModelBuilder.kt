@@ -2,7 +2,6 @@ package me.tbsten.koma.strict.idea.frontend
 
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.IndexNotReadyException
-import com.intellij.psi.SmartPointerManager
 import me.tbsten.koma.strict.idea.model.DiagramStateNode
 import me.tbsten.koma.strict.idea.model.GroupState
 import me.tbsten.koma.strict.idea.model.LeafState
@@ -249,6 +248,5 @@ object StoreSpecModelBuilder {
         NodeKind.GROUP -> GroupState(node.simpleName, node.id, node.children.map { degradedNode(it) }, source = anchorFor(node.psi))
     }
 
-    private fun anchorFor(psi: KtClassOrObject): PsiSourceAnchor =
-        PsiSourceAnchor(SmartPointerManager.getInstance(psi.project).createSmartPsiElementPointer(psi))
+    private fun anchorFor(psi: KtClassOrObject): PsiSourceAnchor = anchorTo(psi)
 }

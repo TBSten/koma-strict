@@ -115,6 +115,12 @@ data class GraphEdge(
     val emits: List<String> = emptyList(),
     /** True for a `Stay` self-loop ([fromId] == [toId]). */
     val stay: Boolean = false,
+    /**
+     * Declaration of the trigger that produced this edge — its `@OnEnter` / `@OnAction` / `@OnRecover`
+     * annotation site — for click-to-declaration from the arrow (`ide-4.md`). Null for the INITIAL edge
+     * (which comes from `@StoreSpec(initial)`, not a trigger) and in pure tests.
+     */
+    val source: SourceAnchor? = null,
 ) {
     /** Rendered edge label, e.g. `onEnter / LoadFailed`, `loadMore (stay)`. Empty for INITIAL. */
     val label: String
@@ -138,6 +144,8 @@ data class ScopeStay(
     val kind: EdgeKind,
     val trigger: String,
     val emits: List<String> = emptyList(),
+    /** Declaration of the scope-shared trigger's annotation site, for click-to-declaration (`ide-4.md`). */
+    val source: SourceAnchor? = null,
 ) {
     /** Rendered label, same format as [GraphEdge.label] with the implicit `(stay)` marker. */
     val label: String

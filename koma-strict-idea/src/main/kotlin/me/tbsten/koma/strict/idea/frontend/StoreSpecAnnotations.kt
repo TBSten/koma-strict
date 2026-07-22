@@ -4,6 +4,7 @@ import me.tbsten.koma.strict.idea.model.ActionTrigger
 import me.tbsten.koma.strict.idea.model.EnterTrigger
 import me.tbsten.koma.strict.idea.model.ExitInfo
 import me.tbsten.koma.strict.idea.model.RecoverTrigger
+import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StateId
 import me.tbsten.koma.strict.idea.model.UNRESOLVED_MARKER
 import org.jetbrains.kotlin.analysis.api.KaSession
@@ -49,7 +50,13 @@ internal fun KaSession.readTriggers(
     val annotations = psi.symbol.annotations
     val enter = if (!includeEnter) null else annotations.firstOrNull { it.fqName() == KomaStrictFq.ON_ENTER }?.let { ann ->
         val ns = readNextState(ann, fqToId)
-        EnterTrigger(targets = ns.targets, stay = ns.stay, emits = readEmits(ann), unresolvedTargets = ns.unresolvedTargets)
+        EnterTrigger(
+            targets = ns.targets,
+            stay = ns.stay,
+            emits = readEmits(ann),
+            unresolvedTargets = ns.unresolvedTargets,
+            source = ann.entryAnchor(),
+        )
     }
     val exit = annotations.firstOrNull { it.fqName() == KomaStrictFq.ON_EXIT }
         ?.let { ExitInfo(emits = readEmits(it)) }
@@ -83,6 +90,7 @@ private fun KaSession.readActions(
         stay = ns.stay,
         emits = readEmits(ann),
         unresolvedTargets = ns.unresolvedTargets,
+        source = ann.entryAnchor(),
     )
 }
 
@@ -98,6 +106,7 @@ private fun KaSession.readRecovers(
         stay = ns.stay,
         emits = readEmits(ann),
         unresolvedTargets = ns.unresolvedTargets,
+        source = ann.entryAnchor(),
     )
 }
 
@@ -188,3 +197,10 @@ private fun KaSession.typeArgumentSimpleName(ann: KaAnnotation): String? {
 }
 
 private fun KaAnnotation.fqName(): String? = classId?.asFqNameString()
+
+/**
+ * Click-to-declaration anchor for the trigger this annotation declares (`ide-4.md`): a smart pointer to
+ * the `@On…` annotation application. Null when the annotation has no source PSI (e.g. an inherited /
+ * synthetic annotation), in which case the transition arrow simply stays non-navigable.
+ */
+private fun KaAnnotation.entryAnchor(): SourceAnchor? = (psi as? KtAnnotationEntry)?.let { anchorTo(it) }

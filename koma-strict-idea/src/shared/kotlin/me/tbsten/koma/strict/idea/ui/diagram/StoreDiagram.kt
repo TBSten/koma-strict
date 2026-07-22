@@ -194,7 +194,12 @@ private class TapHit(val selection: DiagramSelection?, val source: SourceAnchor?
  * rectangle / composite label strip (pure [hitElement]) wins, then a label pill, then a self-loop /
  * scope-stay arc, then an edge line. Labels and arcs are positioned only while drawing, so they come
  * from the draw-time [DiagramInteractionSink] and are matched in pre-scale px (`offset / renderZoom`),
- * the same space [drawDiagram] records them in. [TapHit.source] is the click-to-declaration target.
+ * the same space [drawDiagram] records them in.
+ *
+ * [TapHit.source] is the click-to-declaration target: a node / composite box resolves to its state
+ * declaration via [hitSource]; a transition (arrow / label / stay arc) has no declaration of its own,
+ * so it navigates to the trigger's `@On…` annotation carried on the selected edge / stay arc
+ * ([DiagramSelection.Edge] / [DiagramSelection.Stay], `ide-4.md`).
  */
 private fun PointerInputScope.resolveTap(ctx: DiagramHitContext, offset: Offset): TapHit {
     // px -> renderZoom を戻して -> レイアウト単位 (dp)。auto-fit 時も実描画倍率で戻すので図とずれない。
@@ -212,7 +217,12 @@ private fun PointerInputScope.resolveTap(ctx: DiagramHitContext, offset: Offset)
             ?: ctx.sink.arcs.firstOrNull { distanceToPolyline(it.second, pxx, pxy) <= tolPx }?.first
             ?: el
     }
-    return TapHit(selection, ctx.graph.hitSource(ctx.layout, ux, uy))
+    // node/composite は hitSource が宣言を返す。transition (edge/stay) は宣言を持たないので、
+    // 選択した要素が運ぶトリガ注釈のアンカーへ飛ばす。
+    val source = ctx.graph.hitSource(ctx.layout, ux, uy)
+        ?: (selection as? DiagramSelection.Edge)?.edge?.source
+        ?: (selection as? DiagramSelection.Stay)?.stay?.source
+    return TapHit(selection, source)
 }
 
 /**

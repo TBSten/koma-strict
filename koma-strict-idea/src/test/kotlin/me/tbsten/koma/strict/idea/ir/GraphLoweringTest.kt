@@ -3,6 +3,7 @@ package me.tbsten.koma.strict.idea.ir
 import me.tbsten.koma.strict.idea.SampleModels
 import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.model.ActionTrigger
+import me.tbsten.koma.strict.idea.model.EnterTrigger
 import me.tbsten.koma.strict.idea.model.GroupState
 import me.tbsten.koma.strict.idea.model.LeafState
 import me.tbsten.koma.strict.idea.model.RootState
@@ -159,6 +160,42 @@ class GraphLoweringTest {
         assertSame("group any-state は group の source を運ぶ", groupAnchor, groupAny.source)
         val box = graph.composites.first { it.id == NodeId.composite("G") }
         assertSame("composite box は group の source を運ぶ", groupAnchor, box.source)
+    }
+
+    @Test
+    fun `トリガの source が GraphEdge と ScopeStay に伝播する`() {
+        val enterAnchor = object : SourceAnchor {}
+        val actionAnchor = object : SourceAnchor {}
+        val sharedStayAnchor = object : SourceAnchor {}
+        val root = RootState(
+            simpleName = "S",
+            children = listOf(
+                LeafState(
+                    simpleName = "A",
+                    id = StateId("A"),
+                    // leaf @OnEnter: A -> B の enter エッジ。
+                    enter = EnterTrigger(targets = listOf(StateId("B")), source = enterAnchor),
+                    // leaf @OnAction(stay): A の self-loop エッジ。
+                    actions = listOf(ActionTrigger("Ping", targets = emptyList(), stay = true, source = actionAnchor)),
+                ),
+                LeafState("B", StateId("B")),
+            ),
+            // root 共有 @OnAction(stay): scope-stay 弧 (any ノードは生まれない)。
+            actions = listOf(ActionTrigger("Refresh", targets = emptyList(), stay = true, source = sharedStayAnchor)),
+        )
+        val graph = GraphLowering.lower(StoreDiagramModel(root = root, initial = listOf(StateId("A"))))
+
+        // enter エッジ (A -> B) と self-loop エッジ (A -> A) がそれぞれのトリガ source を運ぶ。
+        assertSame("enter エッジは @OnEnter の source", enterAnchor, graph.edge(NodeId.state("A"), NodeId.state("B"))?.source)
+        val selfLoop = graph.edges.first { it.fromId == NodeId.state("A") && it.stay }
+        assertSame("leaf stay self-loop は @OnAction の source", actionAnchor, selfLoop.source)
+
+        // root 共有 stay は ScopeStay になり、その source を運ぶ。
+        val scopeStay = graph.scopeStays.single { it.scope == StateId.Root }
+        assertSame("scope-stay は共有トリガの source", sharedStayAnchor, scopeStay.source)
+
+        // INITIAL エッジ ([*] -> A) は @StoreSpec 由来なので source を持たない。
+        assertNull("INITIAL エッジは source 無し", graph.edge(StartNode.START_ID, NodeId.state("A"))?.source)
     }
 
     @Test
