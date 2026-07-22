@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -23,17 +25,14 @@ import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import me.tbsten.koma.strict.idea.ui.component.DegradedBanner
+import me.tbsten.koma.strict.idea.ui.component.DiagramZoomControls
 import me.tbsten.koma.strict.idea.ui.component.Header
 import me.tbsten.koma.strict.idea.ui.component.IndexingGuidance
 import me.tbsten.koma.strict.idea.ui.component.RenderErrorGuidance
 import me.tbsten.koma.strict.idea.ui.component.SetupGuidance
-import me.tbsten.koma.strict.idea.ui.component.TabBar
 import me.tbsten.koma.strict.idea.ui.component.UnresolvedBanner
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import kotlin.coroutines.cancellation.CancellationException
-
-/** The tool-window tabs: the figure and its ground-truth transition table (`ide.md` "図 + 遷移表"). */
-enum class DiagramTab(val label: String) { Diagram("Diagram"), Transitions("Transitions") }
 
 /**
  * Wider layer / sibling gaps than the layout defaults so the Mealy edge labels (`trigger / Event`)
@@ -42,22 +41,22 @@ enum class DiagramTab(val label: String) { Diagram("Diagram"), Transitions("Tran
 private val UiLayoutConfig = LayoutConfig(layerGap = 208.0, siblingGap = 60.0)
 
 /**
- * Shared tool-window content for the Koma Strict plugin: the live state diagram + its transition
- * table (`ide.md` "図 + 遷移表" pair). Framework-neutral — only Compose Foundation and Jewel APIs —
- * so the identical source compiles against the bundled Jewel in the IDE plugin and the standalone
- * Jewel Int UI in the headless `renderComposeScene` preview. A Jewel theme must already be installed
- * by the caller (`addComposeTab` / `IntUiTheme`).
+ * Shared tool-window content for the Koma Strict plugin: the live state diagram (`ide.md`).
+ * Framework-neutral — only Compose Foundation and Jewel APIs — so the identical source compiles
+ * against the bundled Jewel in the IDE plugin and the standalone Jewel Int UI in the headless
+ * `renderComposeScene` preview. A Jewel theme must already be installed by the caller
+ * (`addComposeTab` / `IntUiTheme`).
  *
  * When [stores] is empty the window shows setup guidance; with one or more it renders a [Header]
- * (store selector + zoom + LR/TB toggle + Copy image + Reload), the Diagram / Transitions [TabBar], and — for a
- * degraded model — a [DegradedBanner] while still showing whatever names resolved. The composables
- * for each surface live in their own files (`Header`, `TabBar`, `Guidance`).
+ * (store selector + LR/TB toggle + Copy image + Reload), the diagram itself with floating zoom
+ * controls at its bottom-right ([DiagramZoomControls]), and — for a degraded model — a
+ * [DegradedBanner] while still showing whatever names resolved. The composables for each surface
+ * live in their own files (`Header`, `Guidance`).
  */
 @Composable
 fun KomaStrictToolWindowContent(
     stores: List<StoreDiagramModel> = emptyList(),
     onNavigate: (SourceAnchor) -> Unit = {},
-    initialTab: DiagramTab = DiagramTab.Diagram,
     indexing: Boolean = false,
     onReload: () -> Unit = {},
 ) {
@@ -79,8 +78,7 @@ fun KomaStrictToolWindowContent(
         // 選択は store の識別名リストで安定化する。再解析ごとに stores 参照は変わるが、
         // 中身 (store の集合) が同じなら選択を保持し、編集中に表示 store が先頭へ戻らないようにする。
         var selected by remember(stores.map { it.root.simpleName }) { mutableStateOf(0) }
-        var direction by remember { mutableStateOf(LayoutDirection.LR) }
-        var tab by remember { mutableStateOf(initialTab) }
+        var direction by remember { mutableStateOf(LayoutDirection.TB) }
         var zoom by remember { mutableStateOf(1f) }
 
         val model = stores[selected.coerceIn(0, stores.lastIndex)]
@@ -101,28 +99,22 @@ fun KomaStrictToolWindowContent(
             }
         }
 
-        // "Copy image": 現在の図をオフスクリーン描画してクリップボードへ。図が描けていて Diagram タブを
-        // 表示している時だけ出す (zoom コントロールと同じ条件。Transitions 表示中に出しても紛らわしく、
-        // 狭ドックで Reload を押し出すだけ)。density / layoutDirection / TextMeasurer は composition から
-        // 取り、描画は画面と同一パス (drawDiagram) を使う。
+        // "Copy image": 現在の図をオフスクリーン描画してクリップボードへ。図が描けている時だけ出す。
+        // density / layoutDirection / TextMeasurer は composition から取り、描画は画面と同一パス (drawDiagram) を使う。
         val density = LocalDensity.current
         val composeLayoutDirection = LocalLayoutDirection.current
         val copyTextMeasurer = rememberTextMeasurer()
-        val onCopyImage: (() -> Boolean)? = if (tab == DiagramTab.Diagram) {
-            prepared.getOrNull()?.let { (graph, graphLayout) ->
-                {
-                    copyDiagramImageToClipboard(
-                        graph = graph,
-                        layout = graphLayout,
-                        colors = colors,
-                        density = density,
-                        layoutDirection = composeLayoutDirection,
-                        textMeasurer = copyTextMeasurer,
-                    )
-                }
+        val onCopyImage: (() -> Boolean)? = prepared.getOrNull()?.let { (graph, graphLayout) ->
+            {
+                copyDiagramImageToClipboard(
+                    graph = graph,
+                    layout = graphLayout,
+                    colors = colors,
+                    density = density,
+                    layoutDirection = composeLayoutDirection,
+                    textMeasurer = copyTextMeasurer,
+                )
             }
-        } else {
-            null
         }
 
         Header(
@@ -133,11 +125,6 @@ fun KomaStrictToolWindowContent(
             onToggleDirection = {
                 direction = if (direction == LayoutDirection.LR) LayoutDirection.TB else LayoutDirection.LR
             },
-            zoom = zoom,
-            showZoom = prepared.isSuccess && tab == DiagramTab.Diagram,
-            onZoomIn = { zoom = (zoom + 0.15f).coerceAtMost(2.5f) },
-            onZoomOut = { zoom = (zoom - 0.15f).coerceAtLeast(0.5f) },
-            onZoomReset = { zoom = 1f },
             onReload = onReload,
             colors = colors,
             onCopyImage = onCopyImage,
@@ -146,26 +133,32 @@ fun KomaStrictToolWindowContent(
         // 全 degrade (名前のみ) と partial (一部の参照が未解決) を区別して明示する。
         if (model.degraded) DegradedBanner(model.error, colors)
         else if (model.unresolved) UnresolvedBanner(colors)
-        TabBar(tab = tab, onSelect = { tab = it }, colors = colors)
-        Divider(colors)
 
         Box(Modifier.fillMaxSize()) {
-            when (tab) {
-                DiagramTab.Diagram -> prepared.fold(
-                    onSuccess = { (graph, layout) ->
-                        StoreDiagram(
-                            graph = graph,
-                            layout = layout,
-                            colors = colors,
-                            onNavigate = onNavigate,
-                            zoom = zoom,
-                            // ピンチ / Ctrl+ホイールの倍率を zoom に畳み込む (ボタンと同じ 0.5〜2.5 に制限)。
-                            onZoomBy = { factor -> zoom = (zoom * factor).coerceIn(0.5f, 2.5f) },
-                        )
-                    },
-                    onFailure = { RenderErrorGuidance(it, colors) },
+            prepared.fold(
+                onSuccess = { (graph, layout) ->
+                    StoreDiagram(
+                        graph = graph,
+                        layout = layout,
+                        colors = colors,
+                        onNavigate = onNavigate,
+                        zoom = zoom,
+                        // ピンチ / Ctrl+ホイールの倍率を zoom に畳み込む (ボタンと同じ 0.5〜2.5 に制限)。
+                        onZoomBy = { factor -> zoom = (zoom * factor).coerceIn(0.5f, 2.5f) },
+                    )
+                },
+                onFailure = { RenderErrorGuidance(it, colors) },
+            )
+            // 図の拡大縮小は図が描けている時だけ、canvas の右下に浮かせる (map / draw.io 風)。
+            if (prepared.isSuccess) {
+                DiagramZoomControls(
+                    zoom = zoom,
+                    onZoomIn = { zoom = (zoom + 0.15f).coerceAtMost(2.5f) },
+                    onZoomOut = { zoom = (zoom - 0.15f).coerceAtLeast(0.5f) },
+                    onZoomReset = { zoom = 1f },
+                    colors = colors,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
                 )
-                DiagramTab.Transitions -> TransitionsTable(model = model, colors = colors, onNavigate = onNavigate)
             }
         }
     }

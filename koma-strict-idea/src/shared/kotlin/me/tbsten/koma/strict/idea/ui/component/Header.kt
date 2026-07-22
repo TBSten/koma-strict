@@ -1,12 +1,10 @@
 package me.tbsten.koma.strict.idea.ui.component
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,14 +23,13 @@ import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
 
 /**
  * The tool-window header row: the store selector (a [Dropdown] only when more than one `@StoreSpec`
- * is in the file), the diagram zoom controls (shown on the Diagram tab only), the `LR`/`TB` layout
- * toggle, a "Copy image" action (only when a figure is actually rendered — [onCopyImage] non-null),
- * and a manual Reload. The product name is intentionally omitted — the `addComposeTab` "Koma Strict"
- * tab already carries it — so a narrow dock spends its width on the controls.
+ * is in the file), the `LR`/`TB` layout toggle, a "Copy image" action (only when a figure is actually
+ * rendered — [onCopyImage] non-null), and a manual Reload. The diagram zoom sits on the canvas itself
+ * ([DiagramZoomControls]), not here. The product name is intentionally omitted — the `addComposeTab`
+ * "Koma Strict" tab already carries it — so a narrow dock spends its width on the controls.
  *
  * [onCopyImage] copies the current figure to the system clipboard and reports success; on success the
  * button briefly reads "Copied" as feedback before reverting.
@@ -45,11 +42,6 @@ internal fun Header(
     onSelect: (Int) -> Unit,
     direction: LayoutDirection,
     onToggleDirection: () -> Unit,
-    zoom: Float,
-    showZoom: Boolean,
-    onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit,
-    onZoomReset: () -> Unit,
     onReload: () -> Unit,
     colors: DiagramColors,
     onCopyImage: (() -> Boolean)? = null,
@@ -81,17 +73,6 @@ internal fun Header(
             Text(stores.first().root.simpleName, fontWeight = FontWeight.SemiBold, color = colors.nodeText)
         }
         Spacer(Modifier.weight(1f))
-        // 図の拡大縮小。Diagram タブでのみ出す (表には効かない)。% クリックで 100% に戻す。
-        if (showZoom) {
-            OutlinedButton(onClick = onZoomOut) { Text("−") }
-            Text(
-                "${(zoom * 100).roundToInt()}%",
-                color = colors.compositeLabel,
-                modifier = Modifier.clickable(onClick = onZoomReset).padding(horizontal = 4.dp),
-            )
-            OutlinedButton(onClick = onZoomIn) { Text("+") }
-            Spacer(Modifier.width(12.dp))
-        }
         // トグルなので「何のコントロールか (Layout)」と「押すと切り替わる (⇄)」を明示し、現在値だけの曖昧さを消す。
         Text("Layout", color = colors.compositeLabel)
         OutlinedButton(onClick = onToggleDirection) {

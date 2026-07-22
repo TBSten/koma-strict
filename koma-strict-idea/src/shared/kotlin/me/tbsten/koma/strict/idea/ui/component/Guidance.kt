@@ -21,9 +21,8 @@ import kotlin.math.roundToInt
 /**
  * The message surfaces the tool window shows instead of (or above) the diagram: a degraded-analysis
  * banner, and the full-window "indexing", "render error", and "no @StoreSpec" guidance states.
+ * A thin inline banner above the tabs when the model resolved only partially (names, no triggers).
  */
-
-/** A thin inline banner above the tabs when the model resolved only partially (names, no triggers). */
 @Composable
 internal fun DegradedBanner(error: String?, colors: DiagramColors) {
     Box(
@@ -64,8 +63,8 @@ internal fun UnresolvedBanner(colors: DiagramColors) {
  * A thin inline banner shown above the diagram when the figure is larger than the canvas extent cap
  * and has been auto-fit down to a smaller zoom so nothing is clipped (`ide-review.md` P1-08). Without
  * it the automatic shrink from [requestedZoom] to [renderZoom] would look like a rendering bug; the
- * banner makes the trade-off explicit and points at the Transitions tab, which always lists every
- * transition in full regardless of figure size.
+ * banner makes the trade-off explicit and reassures that nothing is dropped — the figure is scrollable
+ * / zoomable to reach every node in full regardless of figure size.
  */
 @Composable
 internal fun OversizeBanner(requestedZoom: Float, renderZoom: Float, colors: DiagramColors) {
@@ -79,7 +78,7 @@ internal fun OversizeBanner(requestedZoom: Float, renderZoom: Float, colors: Dia
     ) {
         Text(
             "Diagram too large to show at $requestedPct% — scaled to $fitPct% to fit. " +
-                "No states or transitions are hidden; the Transitions tab lists them all.",
+                "No states or transitions are hidden; scroll or zoom to see any node in full.",
             color = colors.warningText,
         )
     }

@@ -18,10 +18,8 @@ import me.tbsten.koma.strict.idea.layout.LayoutConfig
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import me.tbsten.koma.strict.idea.ui.DiagramSelection
-import me.tbsten.koma.strict.idea.ui.DiagramTab
 import me.tbsten.koma.strict.idea.ui.KomaStrictToolWindowContent
 import me.tbsten.koma.strict.idea.ui.StoreDiagram
-import me.tbsten.koma.strict.idea.ui.TransitionsTable
 import me.tbsten.koma.strict.idea.ui.rememberDiagramColors
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
@@ -138,9 +136,6 @@ private fun renderAll(outDir: File) {
     // recover (破線・色つき) + exit バッジ = 認証サンプル (samples.md §5)。
     render(outDir, "auth", 1130, 390, dark = false) { KomaStrictToolWindowContent(listOf(SampleModels.auth())) }
     render(outDir, "auth", 1130, 390, dark = true) { KomaStrictToolWindowContent(listOf(SampleModels.auth())) }
-    render(outDir, "auth-transitions", 900, 440, dark = false) {
-        KomaStrictToolWindowContent(listOf(SampleModels.auth()), initialTab = DiagramTab.Transitions)
-    }
     // 2 段入れ子 composite + group 共有 any Loaded。
     render(outDir, "settings", 1070, 440, dark = false) { KomaStrictToolWindowContent(listOf(SampleModels.settings())) }
     render(outDir, "settings", 1070, 440, dark = true) { KomaStrictToolWindowContent(listOf(SampleModels.settings())) }
@@ -151,22 +146,12 @@ private fun renderAll(outDir: File) {
     render(outDir, "multi", 900, 360, dark = true) {
         KomaStrictToolWindowContent(listOf(SampleModels.lce(), SampleModels.feed(), SampleModels.tabs()))
     }
-    // 全体 UI (ツールバー + タブ + 遷移表) — Transitions タブを開いた状態。
-    render(outDir, "full-transitions-lce", 900, 360, dark = false) {
-        KomaStrictToolWindowContent(listOf(SampleModels.lce()), initialTab = DiagramTab.Transitions)
-    }
-    render(outDir, "full-transitions-feed", 1000, 560, dark = true) {
-        KomaStrictToolWindowContent(listOf(SampleModels.feed()), initialTab = DiagramTab.Transitions)
-    }
-    // 到達不能 state (Broken) の警告色を図・表で確認。
+    // 到達不能 state (Broken) の警告色を確認。
     render(outDir, "unreachable", 1010, 360, dark = false) {
         KomaStrictToolWindowContent(listOf(SampleModels.unreachable()))
     }
     render(outDir, "unreachable", 1010, 360, dark = true) {
         KomaStrictToolWindowContent(listOf(SampleModels.unreachable()))
-    }
-    render(outDir, "unreachable-transitions", 900, 340, dark = false) {
-        KomaStrictToolWindowContent(listOf(SampleModels.unreachable()), initialTab = DiagramTab.Transitions)
     }
     // @StoreSpec 無しファイルのセットアップ案内 (空状態)。
     render(outDir, "setup", 600, 240, dark = false) { KomaStrictToolWindowContent(emptyList()) }
@@ -186,18 +171,13 @@ private fun renderAll(outDir: File) {
     render(outDir, "oversize", 1120, 420, dark = true) {
         KomaStrictToolWindowContent(listOf(SampleModels.longChain(120)))
     }
-    // 遷移表単体 (列レイアウト確認用)。
-    render(outDir, "transitions-lce", 720, 360, dark = false) { TransitionsTablePreview(SampleModels.lce()) }
-    render(outDir, "transitions-feed", 720, 460, dark = false) { TransitionsTablePreview(SampleModels.feed()) }
     render(outDir, "lce-tb", 900, 390, dark = false) { DiagramTbPreview(SampleModels.lce()) }
     render(outDir, "auth-canvas", 1130, 360, dark = false) { DiagramLrPreview(SampleModels.auth()) }
-    // フォーカス検証 (ide-2.md): node 選択で入出力 Transition + 相手 State 以外が alpha 0.5 に落ちる。
-    // feed の Stable.Idle を選択 -> Idle 周りの遷移だけが濃く、Loading/Error/Refreshing 側が減光する。
+    // フォーカス検証 (ide-2.md): node 選択で入出力 Transition + 相手 State 以外が減光する。feed の Stable.Idle。
     render(outDir, "focus-feed-node", 1200, 520, dark = false) {
         DiagramLrFocusPreview(SampleModels.feed()) { DiagramSelection.Node(NodeId.state("Stable", "Idle")) }
     }
-    // フォーカス検証 (ide-2.md): edge 選択で矢印 + 前後 2 State 以外が alpha 0.5 に落ちる。
-    // lce の Loading -> Content 遷移を選択 -> その矢印と Loading/Content 以外 (Error 等) が減光する。
+    // フォーカス検証 (ide-2.md): edge 選択で矢印 + 前後 2 State 以外が減光する。lce の Loading -> Content。
     render(outDir, "focus-lce-edge", 980, 420, dark = false) {
         DiagramLrFocusPreview(SampleModels.lce()) { graph ->
             graph.edges.firstOrNull { it.fromId == NodeId.state("Loading") && it.toId == NodeId.state("Content") }
@@ -206,21 +186,12 @@ private fun renderAll(outDir: File) {
     }
     // TB では @OnExit バッジがノード下に出る (兄弟と重ならない) ことを確認する。
     render(outDir, "auth-tb-canvas", 900, 580, dark = false) { DiagramTbPreview(SampleModels.auth()) }
-    // 狭ドックで遷移表の横スクロール + sticky header を確認する (To/Emit がスクロールで到達可能・列見出しは固定)。
-    render(outDir, "transitions-narrow", 340, 360, dark = false) {
-        KomaStrictToolWindowContent(listOf(SampleModels.feed()), initialTab = DiagramTab.Transitions)
-    }
     render(outDir, "settings-canvas", 1070, 360, dark = false) { DiagramLrPreview(SampleModels.settings()) }
     // group を指す遷移エッジ (SignedOut -> SignedIn グループ): 矢印が composite box 境界に刺さり、
     // 箱を突き抜け/潰れが無いことを確認する。
     render(outDir, "session", 1040, 360, dark = false) { KomaStrictToolWindowContent(listOf(SampleModels.session())) }
     render(outDir, "session", 1040, 360, dark = true) { KomaStrictToolWindowContent(listOf(SampleModels.session())) }
     render(outDir, "session-canvas", 1040, 360, dark = false) { DiagramLrPreview(SampleModels.session()) }
-}
-
-@Composable
-private fun TransitionsTablePreview(model: StoreDiagramModel) {
-    TransitionsTable(model = model, colors = rememberDiagramColors())
 }
 
 /** Renders just the canvas in top-to-bottom direction to eyeball the TB toggle. */
@@ -240,8 +211,8 @@ private fun DiagramLrPreview(model: StoreDiagramModel) {
 }
 
 /**
- * Renders the LR canvas with an initial focus selection (`ide-2.md`) so the alpha-0.5 dimming of
- * focus-out elements shows up in a golden PNG (focus is interactive, so it never appears otherwise).
+ * Renders the LR canvas with an initial focus selection (`ide-2.md`) so the alpha dimming of focus-out
+ * elements shows up in a golden PNG (focus is interactive, so it never appears otherwise).
  */
 @Composable
 private fun DiagramLrFocusPreview(model: StoreDiagramModel, selection: (DiagramGraph) -> DiagramSelection?) {
