@@ -11,7 +11,8 @@ import org.jetbrains.kotlin.psi.KtClassOrObject
  * `NavigationUtil`. A smart pointer is used so the anchor survives edits between analysis and click
  * (it re-resolves lazily), which is why the click target is asserted through the pointer in tests.
  */
-class PsiSourceAnchor(
+@JvmInline
+value class PsiSourceAnchor(
     val pointer: SmartPsiElementPointer<KtClassOrObject>,
 ) : SourceAnchor {
     /** The declaration, or null if it was invalidated (edited / deleted). */
