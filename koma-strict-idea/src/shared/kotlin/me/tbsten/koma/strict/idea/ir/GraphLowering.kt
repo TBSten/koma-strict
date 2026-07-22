@@ -15,10 +15,28 @@ import me.tbsten.koma.strict.idea.model.leaves
 import me.tbsten.koma.strict.idea.model.walk
 
 /**
- * Lowers the slim [StoreDiagramModel] into a renderer-independent [DiagramGraph]:
- * leaves -> [StateGraphNode], `initial` -> a single [StartNode], scope-shared actions / recovers ->
- * [AnyStateNode] pseudo nodes, intermediate sealed nodes -> [CompositeBox]es, and every trigger ->
- * one or more [GraphEdge]s (with a `Stay` self-loop when staying is allowed).
+ * Lowers the slim [StoreDiagramModel] (a sealed-state *tree*) into a renderer-independent
+ * [DiagramGraph] (flat *nodes + edges*), the one place the model's shape is turned into figure
+ * primitives:
+ *
+ * ```
+ *   StoreDiagramModel (tree)                 GraphLowering.lower           DiagramGraph (flat)
+ *   ────────────────────────                 ───────────────────          ───────────────────
+ *   root                                                                  nodes:
+ *    ├─ initial = [A]              ─────────────────────────────────▶       StartNode  [*]  + INITIAL edge
+ *    ├─ leaf A (enter/actions)     ─── leaf ─────────────────────────▶      StateGraphNode
+ *    ├─ group G (intermediate)     ─── intermediate sealed ──────────▶      CompositeBox  (box border)
+ *    │   ├─ leaf B                 ─── leaf ─────────────────────────▶      StateGraphNode
+ *    │   └─ shared trigger …       ─┬─ targeted (nextState) / @OnExit ▶      AnyStateNode  (source of shared edges)
+ *    │                              └─ stay-only ────────────────────▶      ScopeStay     (arc on the enclosure, no any-node)
+ *    └─ every trigger              ─── (state, trigger) ─────────────▶      GraphEdge(s)  (+ Stay self-loop when staying allowed)
+ * ```
+ *
+ * So: leaves -> [StateGraphNode], `initial` -> a single [StartNode], intermediate sealed nodes ->
+ * [CompositeBox]es, scope-shared triggers that *go somewhere* (a `nextState`) or carry an `@OnExit` ->
+ * an [AnyStateNode] pseudo node the shared edges emanate from, scope-shared **stays** -> a [ScopeStay]
+ * arc on the scope enclosure (no any-node — see [anyNodeNeeded]), and every trigger -> one or more
+ * [GraphEdge]s.
  *
  * A transition whose target is an intermediate sealed node (a *group* rather than a concrete leaf)
  * is kept: its edge carries the group's dotted id as [GraphEdge.toId] (matching the [CompositeBox]
