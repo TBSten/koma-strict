@@ -200,10 +200,10 @@ internal class KomaStrictToolWindowController(
     fun navigate(anchor: SourceAnchor) {
         // PSI 解決 (SmartPsiElementPointer.element / canNavigate) は read action 内で行い、
         // 実際の navigate(true) だけを read action の外 (EDT) で呼ぶ (261 系の堅牢パターン)。
-        val declaration = ReadAction.computeBlocking<KtClassOrObject?, RuntimeException> {
-            (anchor as? PsiSourceAnchor)?.declaration?.takeIf { it.canNavigate() }
-        } ?: return
-        declaration.navigate(true)
+        ReadAction
+            .computeBlocking<KtClassOrObject?, RuntimeException> {
+                (anchor as? PsiSourceAnchor)?.declaration?.takeIf { it.canNavigate() }
+            }?.navigate(true)
     }
 
     private companion object {
