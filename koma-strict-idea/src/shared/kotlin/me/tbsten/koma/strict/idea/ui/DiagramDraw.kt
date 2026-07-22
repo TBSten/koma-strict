@@ -70,7 +70,7 @@ internal fun DrawScope.drawDiagram(
         .mapNotNull { layout.nodeRects[it.id]?.let { r -> px(r) } } +
         graph.composites.mapNotNull { layout.compositeRects[it.id]?.let { r -> px(r) } }
     // 枠と content bbox の間隔。LayeredLayout.placeStartOutsideFrame と同一値を使い、start が必ず枠外に出る。
-    val framePad = me.tbsten.koma.strict.idea.layout.LayeredLayout.ROOT_FRAME_PAD.toFloat().dp.toPx()
+    val framePad = me.tbsten.koma.strict.idea.layout.layered.LayeredLayout.ROOT_FRAME_PAD.toFloat().dp.toPx()
     val rootFrame: PxRect? = if (contentPx.isEmpty()) {
         null
     } else {

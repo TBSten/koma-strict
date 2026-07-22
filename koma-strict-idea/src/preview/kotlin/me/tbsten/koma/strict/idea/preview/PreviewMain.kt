@@ -13,7 +13,7 @@ import me.tbsten.koma.strict.idea.SampleModels
 import me.tbsten.koma.strict.idea.ir.DiagramGraph
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
-import me.tbsten.koma.strict.idea.layout.LayeredLayout
+import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.LayoutConfig
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel

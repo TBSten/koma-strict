@@ -1,7 +1,7 @@
 package me.tbsten.koma.strict.idea.ir
 
 import me.tbsten.koma.strict.idea.SampleModels
-import me.tbsten.koma.strict.idea.layout.LayeredLayout
+import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.model.ActionTrigger
 import me.tbsten.koma.strict.idea.model.GroupState
 import me.tbsten.koma.strict.idea.model.LeafState

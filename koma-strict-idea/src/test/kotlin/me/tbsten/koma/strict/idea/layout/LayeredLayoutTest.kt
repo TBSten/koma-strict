@@ -6,6 +6,7 @@ import me.tbsten.koma.strict.idea.ir.DiagramGraph
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
 import me.tbsten.koma.strict.idea.ir.StartNode
+import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.model.ActionTrigger
 import me.tbsten.koma.strict.idea.model.EnterTrigger
 import me.tbsten.koma.strict.idea.model.GroupState

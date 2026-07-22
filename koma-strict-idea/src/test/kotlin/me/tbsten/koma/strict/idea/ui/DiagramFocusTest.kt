@@ -6,7 +6,7 @@ import me.tbsten.koma.strict.idea.ir.GraphEdge
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
 import me.tbsten.koma.strict.idea.layout.GraphLayout
-import me.tbsten.koma.strict.idea.layout.LayeredLayout
+import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.layout.Point
 import me.tbsten.koma.strict.idea.layout.Size

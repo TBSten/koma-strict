@@ -7,7 +7,7 @@ import me.tbsten.koma.strict.idea.ir.AnyStateNode
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
 import me.tbsten.koma.strict.idea.ir.StartNode
-import me.tbsten.koma.strict.idea.layout.LayeredLayout
+import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.model.GroupState
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StateId
