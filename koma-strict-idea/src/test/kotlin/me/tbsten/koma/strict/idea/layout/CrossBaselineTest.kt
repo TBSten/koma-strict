@@ -3,6 +3,7 @@ package me.tbsten.koma.strict.idea.layout
 import me.tbsten.koma.strict.idea.SampleModels
 import me.tbsten.koma.strict.idea.ir.DiagramGraph
 import me.tbsten.koma.strict.idea.ir.GraphLowering
+import me.tbsten.koma.strict.idea.layout.edge.EdgeRouting
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

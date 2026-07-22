@@ -4,6 +4,7 @@ import me.tbsten.koma.strict.idea.SampleModels
 import me.tbsten.koma.strict.idea.ir.DiagramGraph
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
+import me.tbsten.koma.strict.idea.layout.edge.EdgeRouting
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

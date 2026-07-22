@@ -29,7 +29,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import me.tbsten.koma.strict.idea.ir.DiagramGraph
 import me.tbsten.koma.strict.idea.ir.GraphEdge
-import me.tbsten.koma.strict.idea.layout.EdgeRouting
+import me.tbsten.koma.strict.idea.layout.edge.EdgeRouting
 import me.tbsten.koma.strict.idea.layout.GraphLayout
 import me.tbsten.koma.strict.idea.layout.Point
 import me.tbsten.koma.strict.idea.model.SourceAnchor

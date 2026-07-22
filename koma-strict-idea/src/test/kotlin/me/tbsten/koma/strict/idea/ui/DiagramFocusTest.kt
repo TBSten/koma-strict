@@ -5,12 +5,12 @@ import me.tbsten.koma.strict.idea.ir.EdgeKind
 import me.tbsten.koma.strict.idea.ir.GraphEdge
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
-import me.tbsten.koma.strict.idea.layout.EdgeRouting
 import me.tbsten.koma.strict.idea.layout.GraphLayout
 import me.tbsten.koma.strict.idea.layout.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.layout.Point
 import me.tbsten.koma.strict.idea.layout.Size
+import me.tbsten.koma.strict.idea.layout.edge.EdgeRouting
 import me.tbsten.koma.strict.idea.model.ActionTrigger
 import me.tbsten.koma.strict.idea.model.GroupState
 import me.tbsten.koma.strict.idea.model.LeafState

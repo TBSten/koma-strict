@@ -28,11 +28,11 @@ import me.tbsten.koma.strict.idea.ir.ScopeStay
 import me.tbsten.koma.strict.idea.ir.StartNode
 import me.tbsten.koma.strict.idea.ir.StateGraphNode
 import me.tbsten.koma.strict.idea.model.StateId
-import me.tbsten.koma.strict.idea.layout.EdgeRouting
 import me.tbsten.koma.strict.idea.layout.GraphLayout
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.layout.Rect
-import me.tbsten.koma.strict.idea.layout.endpointRect
+import me.tbsten.koma.strict.idea.layout.edge.EdgeRouting
+import me.tbsten.koma.strict.idea.layout.edge.endpointRect
 import kotlin.math.abs
 import kotlin.math.hypot
 
