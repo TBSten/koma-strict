@@ -173,15 +173,39 @@ private fun renderAll(outDir: File) {
     }
     render(outDir, "lce-tb", 900, 390, dark = false) { DiagramTbPreview(SampleModels.lce()) }
     render(outDir, "auth-canvas", 1130, 360, dark = false) { DiagramLrPreview(SampleModels.auth()) }
-    // フォーカス検証 (ide-2.md): node 選択で入出力 Transition + 相手 State 以外が減光する。feed の Stable.Idle。
+    // フォーカス検証 (ide-3.md tier1/2/3): node 選択で自ノードが accent border 強調、入出力 Transition +
+    // 相手 State は通常、それ以外は減光する。feed の Stable.Idle を選択。
     render(outDir, "focus-feed-node", 1200, 520, dark = false) {
-        DiagramLrFocusPreview(SampleModels.feed()) { DiagramSelection.Node(NodeId.state("Stable", "Idle")) }
+        DiagramLrFocusPreview(SampleModels.feed()) { setOf(DiagramSelection.Node(NodeId.state("Stable", "Idle"))) }
     }
-    // フォーカス検証 (ide-2.md): edge 選択で矢印 + 前後 2 State 以外が減光する。lce の Loading -> Content。
+    // edge 選択: 矢印が太く・ラベルが accent 枠で囲まれ、前後 2 State 以外が減光する。lce の Loading -> Content。
     render(outDir, "focus-lce-edge", 980, 420, dark = false) {
         DiagramLrFocusPreview(SampleModels.lce()) { graph ->
-            graph.edges.firstOrNull { it.fromId == NodeId.state("Loading") && it.toId == NodeId.state("Content") }
-                ?.let { DiagramSelection.Edge(it) }
+            setOfNotNull(
+                graph.edges.firstOrNull { it.fromId == NodeId.state("Loading") && it.toId == NodeId.state("Content") }
+                    ?.let { DiagramSelection.Edge(it) },
+            )
+        }
+    }
+    // nest state (composite) 選択: 箱が accent border 強調、配下の子 State + 直結矢印だけ残り他は減光する。
+    render(outDir, "focus-settings-composite", 1070, 460, dark = false) {
+        DiagramLrFocusPreview(SampleModels.settings()) { graph ->
+            setOfNotNull(graph.composites.firstOrNull()?.let { DiagramSelection.Composite(it.id) })
+        }
+    }
+    // node self-loop (stay) 選択: 自己ループの弧が太く強調される。selfLoops の 1 本目の self-loop を選択。
+    render(outDir, "focus-selfloops-stay", 900, 380, dark = false) {
+        DiagramLrFocusPreview(SampleModels.selfLoops()) { graph ->
+            setOfNotNull(graph.edges.firstOrNull { it.fromId == it.toId }?.let { DiagramSelection.Edge(it) })
+        }
+    }
+    // 複数選択 (Shift): 2 つの State を同時選択すると両方が強調され、両者の focus 集合の和が通常表示になる。
+    render(outDir, "focus-feed-multi", 1200, 520, dark = false) {
+        DiagramLrFocusPreview(SampleModels.feed()) {
+            setOf(
+                DiagramSelection.Node(NodeId.state("Stable", "Idle")),
+                DiagramSelection.Node(NodeId.state("Error")),
+            )
         }
     }
     // TB では @OnExit バッジがノード下に出る (兄弟と重ならない) ことを確認する。
@@ -211,14 +235,15 @@ private fun DiagramLrPreview(model: StoreDiagramModel) {
 }
 
 /**
- * Renders the LR canvas with an initial focus selection (`ide-2.md`) so the alpha dimming of focus-out
- * elements shows up in a golden PNG (focus is interactive, so it never appears otherwise).
+ * Renders the LR canvas with a fixed focus selection (`ide-3.md`) so the tier 1/2/3 emphasis + dimming
+ * shows up in a golden PNG (focus is interactive, so it never appears otherwise). [selection] builds the
+ * selected set from the lowered graph.
  */
 @Composable
-private fun DiagramLrFocusPreview(model: StoreDiagramModel, selection: (DiagramGraph) -> DiagramSelection?) {
+private fun DiagramLrFocusPreview(model: StoreDiagramModel, selection: (DiagramGraph) -> Set<DiagramSelection>) {
     val graph = GraphLowering.lower(model)
     val layout = LayeredLayout.layout(graph, LayoutDirection.LR, LayoutConfig(layerGap = 208.0, siblingGap = 60.0))
-    StoreDiagram(graph = graph, layout = layout, colors = rememberDiagramColors(), initialSelection = selection(graph))
+    StoreDiagram(graph = graph, layout = layout, colors = rememberDiagramColors(), selection = selection(graph))
 }
 
 private fun render(outDir: File, name: String, width: Int, height: Int, dark: Boolean, content: @Composable () -> Unit) {

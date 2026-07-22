@@ -145,6 +145,102 @@ class DiagramFocusTest {
         assertTrue(focusY.isScopeStayFocused(rKeep))
     }
 
+    // root R { G(group){ In1(Go->Out) }, Out }。In1 -> Out はグループ外へ出るエッジ。
+    private fun groupEdgeModel(): StoreDiagramModel {
+        val group = GroupState(
+            simpleName = "G",
+            id = StateId("G"),
+            children = listOf(
+                LeafState("In1", StateId("G", "In1"), actions = listOf(ActionTrigger("Go", targets = listOf(StateId("Out"))))),
+            ),
+        )
+        val root = RootState(
+            simpleName = "R",
+            children = listOf(group, LeafState("Out", StateId("Out"))),
+        )
+        return StoreDiagramModel(root = root, initial = listOf(StateId("G", "In1")))
+    }
+
+    @Test
+    fun `選択そのものは selected に記録され 隣接は selected には入らない (ide-3)`() {
+        val graph = GraphLowering.lower(abcModel())
+        val a = NodeId.state("A")
+        val b = NodeId.state("B")
+
+        val nodeFocus = graph.focusFrom(DiagramSelection.Node(a))
+        // A は selected (tier1)、隣接 B は focused だが selected ではない。
+        assertTrue(nodeFocus.isNodeSelected(a))
+        assertFalse(nodeFocus.isNodeSelected(b))
+        assertTrue(nodeFocus.isNodeFocused(b))
+
+        val goAB = edge(graph, a, b)
+        val edgeFocus = graph.focusFrom(DiagramSelection.Edge(goAB))
+        assertTrue(edgeFocus.isEdgeSelected(goAB))
+        assertFalse(edgeFocus.isNodeSelected(a))
+    }
+
+    @Test
+    fun `nest state 選択で配下 State と直結エッジが focus・外の相手ノードは外れる (ide-3)`() {
+        val graph = GraphLowering.lower(groupEdgeModel())
+        val g = NodeId.Composite(StateId("G"))
+        val in1 = NodeId.state("G", "In1")
+        val out = NodeId.state("Out")
+
+        val focus = graph.focusFrom(DiagramSelection.Composite(g))
+
+        // composite 自身は selected + focused、配下 In1 は focus、直結エッジ In1->Out も focus。
+        assertTrue(focus.isCompositeSelected(g))
+        assertTrue(focus.isCompositeFocused(g))
+        assertTrue(focus.isNodeFocused(in1))
+        assertTrue(focus.isEdgeFocused(edge(graph, in1, out)))
+        // グループ外へ出る相手ノード Out は focus に入らない (薄いまま) = 素直な仕様解釈。
+        assertFalse(focus.isNodeFocused(out))
+    }
+
+    @Test
+    fun `scope-stay 選択でそのスコープの State と composite が focus に入る (ide-3)`() {
+        val graph = GraphLowering.lower(groupScopeModel())
+        val gKeep = graph.scopeStays.first { it.scope == StateId("G") }
+
+        val focus = graph.focusFrom(DiagramSelection.Stay(gKeep))
+
+        assertTrue(focus.isStaySelected(gKeep))
+        assertTrue(focus.isScopeStayFocused(gKeep))
+        // G スコープの member (X) と composite G が focus。
+        assertTrue(focus.isNodeFocused(NodeId.state("G", "X")))
+        assertTrue(focus.isCompositeFocused(NodeId.Composite(StateId("G"))))
+    }
+
+    @Test
+    fun `複数選択は各 focus 集合の和になる (ide-3)`() {
+        val graph = GraphLowering.lower(abcModel())
+        val a = NodeId.state("A")
+        val c = NodeId.state("C")
+        val b = NodeId.state("B")
+
+        val focus = graph.focusFrom(setOf(DiagramSelection.Node(a), DiagramSelection.Node(c)))
+
+        // A・C の両方が selected、両者の隣接 B は focus (和集合)。
+        assertTrue(focus.isNodeSelected(a))
+        assertTrue(focus.isNodeSelected(c))
+        assertTrue(focus.isNodeFocused(b))
+        assertTrue(focus.isEdgeFocused(edge(graph, a, b)))
+        assertTrue(focus.isEdgeFocused(edge(graph, c, b)))
+    }
+
+    @Test
+    fun `hitElement は composite ラベル帯で Composite を返す (ide-3)`() {
+        val graph = GraphLowering.lower(groupEdgeModel())
+        val layout = LayeredLayout.layout(graph)
+        val routes = EdgeRouting.routeAll(graph, layout)
+        val g = NodeId.Composite(StateId("G"))
+        val box = layout.compositeRects[g]!!
+
+        // 箱の上端ラベル帯 (strip) 内をクリック -> Composite 選択。
+        val hit = graph.hitElement(layout, routes, box.x + 5.0, box.y + 3.0)
+        assertEquals(DiagramSelection.Composite(g), hit)
+    }
+
     @Test
     fun `hitElement はノード矩形中心でそのノードを返し 図の外では null`() {
         val graph = GraphLowering.lower(abcModel())

@@ -70,8 +70,9 @@ fun rememberDiagramColors(): DiagramColors {
     return remember(background, text, muted, border, dark) {
         DiagramColors(
             background = background,
-            // node / any は panel 背景から僅かに前景色へ寄せてカード感を出す (theme 追従の subtle fill)。
-            nodeFill = lerp(background, text, 0.06f),
+            // node は前景色の半透明塗り (`ide-3.md`)。panel 上では従来と同じ淡いカード地に見え、composite
+            // (半透明の灰) の上では下地が透けて入れ子の重なりが自然に見える。any は従来通り不透明の subtle fill。
+            nodeFill = text.copy(alpha = 0.06f),
             nodeBorder = border,
             nodeText = text,
             anyFill = lerp(background, text, 0.04f),

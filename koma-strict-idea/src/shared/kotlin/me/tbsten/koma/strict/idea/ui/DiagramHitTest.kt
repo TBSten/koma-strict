@@ -52,62 +52,142 @@ internal fun DiagramGraph.hitSource(layout: GraphLayout, x: Double, y: Double): 
 }
 
 /**
- * A user selection in the diagram that drives focus (`ide-2.md`): either a state frame ([Node]) or a
- * transition arrow ([Edge]). Resolved from a click by [hitElement]; folded into a [FocusSet] by
- * [focusFrom]. Deliberately a two-case model — composite boxes and the `[*]` start dot are not
- * focus targets in the spec.
+ * A user selection in the diagram that drives focus (`ide-2.md` / `ide-3.md`). Four kinds of focus
+ * target: a state frame ([Node]), a transition arrow ([Edge], including a node `Stay` self-loop), a
+ * nest-state box ([Composite]), or a scope-shared stay arc ([Stay]). The `[*]` start dot is not a
+ * focus target. Resolved from a click by [hitElement] (nodes/composites) and the draw-time sink
+ * (labels/arcs); a set of these is folded into a [FocusSet] by [focusFrom]. Multiple selections
+ * coexist (Shift-click).
  */
 sealed interface DiagramSelection {
     /** A state / any-state frame was selected. */
     data class Node(val id: NodeId) : DiagramSelection
 
-    /** A transition arrow was selected (a routed edge, including a `Stay` self-loop). */
+    /** A transition arrow was selected (a routed edge, including a node `Stay` self-loop). */
     data class Edge(val edge: GraphEdge) : DiagramSelection
+
+    /** A nest-state (composite) box was selected — [id] is its [NodeId.Composite]. */
+    data class Composite(val id: NodeId) : DiagramSelection
+
+    /** A scope-shared stay arc (`@On…(stay)` on a scope enclosure) was selected. */
+    data class Stay(val stay: ScopeStay) : DiagramSelection
 }
 
 /**
- * The elements kept at full opacity while a selection is focused; every element *not* in the set is
- * drawn dimmed (`ide-2.md`: focus-out elements go to half alpha). Built by [focusFrom]. A `null`
- * `FocusSet` (never an empty one) is the caller's signal for "no focus — draw everything normally".
+ * The elements to keep bright while something is focused, plus the elements that are actually
+ * *selected* (`ide-3.md` three tiers). `isXxxFocused` = tier 2 (selected **or** directly connected →
+ * full opacity); `isXxxSelected` = tier 1 (the click target → emphasized on top). Everything in
+ * neither is tier 3 (dimmed). Built by [focusFrom]. A `null` `FocusSet` (never an empty one) is the
+ * caller's signal for "no focus — draw everything normally".
  */
 internal class FocusSet(
     val nodeIds: Set<NodeId>,
     val edges: Set<GraphEdge>,
     val scopeStays: Set<ScopeStay>,
+    /** Composite boxes kept bright (contain a focused node, or are the selected box / its subtree). */
+    val compositeIds: Set<NodeId> = emptySet(),
+    val selectedNodes: Set<NodeId> = emptySet(),
+    val selectedEdges: Set<GraphEdge> = emptySet(),
+    val selectedComposites: Set<NodeId> = emptySet(),
+    val selectedStays: Set<ScopeStay> = emptySet(),
 ) {
     fun isNodeFocused(id: NodeId): Boolean = id in nodeIds
     fun isEdgeFocused(edge: GraphEdge): Boolean = edge in edges
     fun isScopeStayFocused(stay: ScopeStay): Boolean = stay in scopeStays
+    fun isCompositeFocused(id: NodeId): Boolean = id in compositeIds
+
+    fun isNodeSelected(id: NodeId): Boolean = id in selectedNodes
+    fun isEdgeSelected(edge: GraphEdge): Boolean = edge in selectedEdges
+    fun isCompositeSelected(id: NodeId): Boolean = id in selectedComposites
+    fun isStaySelected(stay: ScopeStay): Boolean = stay in selectedStays
 }
+
+/** Convenience for a single selection (folds through the set-based [focusFrom]). */
+internal fun DiagramGraph.focusFrom(selection: DiagramSelection): FocusSet = focusFrom(setOf(selection))
 
 /**
- * Pure focus-set computation for a [selection] (`ide-2.md`), independent of layout so it can be unit
- * tested:
+ * Pure focus-set computation for a set of [selections] (`ide-3.md`), independent of layout so it can
+ * be unit tested. The result is the **union** of each selection's contribution; each selection also
+ * records itself into the `selected*` sets (tier 1 emphasis). Per kind:
  * - **[DiagramSelection.Node]**: every edge incident to the node (in / out, including its own `Stay`
  *   self-loops) plus each of those edges' counterpart nodes, plus the scope-shared stays of every
- *   scope that contains the node (a root-shared stay fires on every state, a group-shared stay on the
- *   states inside that group).
- * - **[DiagramSelection.Edge]**: just that edge and its two endpoint nodes.
+ *   scope that contains the node, plus the composite boxes enclosing any of those nodes.
+ * - **[DiagramSelection.Edge]**: that edge, its two endpoint nodes, and their enclosing boxes.
+ * - **[DiagramSelection.Composite]**: the box, all descendant state / any nodes, every edge incident
+ *   to a descendant (so an edge leaving the group stays bright; its outside counterpart node does
+ *   **not**), the scope-shared stays inside the subtree, and the descendant boxes.
+ * - **[DiagramSelection.Stay]**: the stay itself, plus the states inside its scope and the boxes of
+ *   that scope subtree (the states the shared stay fires on).
  */
-internal fun DiagramGraph.focusFrom(selection: DiagramSelection): FocusSet = when (selection) {
-    is DiagramSelection.Edge -> {
-        val e = selection.edge
-        FocusSet(nodeIds = setOf(e.fromId, e.toId), edges = setOf(e), scopeStays = emptySet())
-    }
+internal fun DiagramGraph.focusFrom(selections: Set<DiagramSelection>): FocusSet {
+    val nodeIds = mutableSetOf<NodeId>()
+    val edgeSet = mutableSetOf<GraphEdge>()
+    val stays = mutableSetOf<ScopeStay>()
+    val compositeIds = mutableSetOf<NodeId>()
+    val selNodes = mutableSetOf<NodeId>()
+    val selEdges = mutableSetOf<GraphEdge>()
+    val selComposites = mutableSetOf<NodeId>()
+    val selStays = mutableSetOf<ScopeStay>()
 
-    is DiagramSelection.Node -> {
-        val id = selection.id
-        val incident = edges.filter { it.fromId == id || it.toId == id }
-        val nodeIds = incident.flatMapTo(mutableSetOf()) { listOf(it.fromId, it.toId) }.apply { add(id) }
-        val path = nodePath(id)
-        val stays = if (path == null) {
-            emptySet()
-        } else {
-            scopeStays.filterTo(mutableSetOf()) { it.scope.containsOrEquals(path) }
+    for (selection in selections) {
+        when (selection) {
+            is DiagramSelection.Node -> {
+                val id = selection.id
+                selNodes += id
+                val incident = edges.filter { it.fromId == id || it.toId == id }
+                val branch = incident.flatMapTo(mutableSetOf()) { listOf(it.fromId, it.toId) }.apply { add(id) }
+                nodeIds += branch
+                edgeSet += incident
+                nodePath(id)?.let { p -> stays += scopeStays.filter { it.scope.containsOrEquals(p) } }
+                compositeIds += compositesCovering(branch.mapNotNull { nodePath(it) })
+            }
+
+            is DiagramSelection.Edge -> {
+                val e = selection.edge
+                selEdges += e
+                edgeSet += e
+                nodeIds += e.fromId
+                nodeIds += e.toId
+                compositeIds += compositesCovering(listOf(e.fromId, e.toId).mapNotNull { nodePath(it) })
+            }
+
+            is DiagramSelection.Composite -> {
+                val boxId = selection.id
+                selComposites += boxId
+                (boxId as? NodeId.Composite)?.path?.let { boxPath ->
+                    val desc = nodes.filterTo(mutableSetOf()) { n -> nodePath(n.id)?.let { boxPath.containsOrEquals(it) } == true }
+                        .mapTo(mutableSetOf()) { it.id }
+                    nodeIds += desc
+                    edgeSet += edges.filter { it.fromId in desc || it.toId in desc }
+                    stays += scopeStays.filter { boxPath.containsOrEquals(it.scope) }
+                    compositeIds += composites.filter { boxPath.containsOrEquals(it.path) }.map { it.id }
+                }
+            }
+
+            is DiagramSelection.Stay -> {
+                val s = selection.stay
+                selStays += s
+                stays += s
+                nodeIds += nodes.filter { n -> nodePath(n.id)?.let { s.scope.containsOrEquals(it) } == true }.map { it.id }
+                compositeIds += composites.filter { s.scope.containsOrEquals(it.path) }.map { it.id }
+            }
         }
-        FocusSet(nodeIds = nodeIds, edges = incident.toSet(), scopeStays = stays)
     }
+    return FocusSet(
+        nodeIds = nodeIds,
+        edges = edgeSet,
+        scopeStays = stays,
+        compositeIds = compositeIds,
+        selectedNodes = selNodes,
+        selectedEdges = selEdges,
+        selectedComposites = selComposites,
+        selectedStays = selStays,
+    )
 }
+
+/** Composite boxes whose path is an ancestor of (or equal to) any of [paths] — the boxes to keep bright. */
+private fun DiagramGraph.compositesCovering(paths: Collection<StateId>): Set<NodeId> =
+    composites.filter { box -> paths.any { box.path.containsOrEquals(it) } }.mapTo(mutableSetOf()) { it.id }
 
 /** The representative state path of a node for scope-stay ownership (null for the `[*]` start dot). */
 private fun DiagramGraph.nodePath(id: NodeId): StateId? = when (val n = node(id)) {
@@ -145,7 +225,15 @@ internal fun DiagramGraph.hitElement(
         val r = layout.nodeRects[node.id] ?: continue
         if (x >= r.x && x <= r.right && y >= r.y && y <= r.bottom) return DiagramSelection.Node(node.id)
     }
-    // 2. 最も近い routed edge の折れ線 (許容距離以内)。斜め線・折れ線でも線に沿った帯だけがヒットする。
+    // 2. composite box のラベル帯 (箱の上端) を選択対象にする (`ide-3.md`)。入れ子は deepest-first。
+    //    帯だけに絞るのは hitSource と同じ理由: 箱の内部は member ノードのクリックに譲る。
+    for (box in composites.sortedByDescending { it.path.segments.size }) {
+        val r = layout.compositeRects[box.id] ?: continue
+        if (x >= r.x && x <= r.right && y >= r.y && y <= r.y + COMPOSITE_LABEL_STRIP_HEIGHT) {
+            return DiagramSelection.Composite(box.id)
+        }
+    }
+    // 3. 最も近い routed edge の折れ線 (許容距離以内)。斜め線・折れ線でも線に沿った帯だけがヒットする。
     var best: GraphEdge? = null
     var bestDist = Double.MAX_VALUE
     for ((edge, pts) in routes) {

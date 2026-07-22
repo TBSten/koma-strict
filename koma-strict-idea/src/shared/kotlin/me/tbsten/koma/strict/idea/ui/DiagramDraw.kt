@@ -31,10 +31,8 @@ import me.tbsten.koma.strict.idea.model.StateId
 import me.tbsten.koma.strict.idea.layout.EdgeRouting
 import me.tbsten.koma.strict.idea.layout.GraphLayout
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
-import me.tbsten.koma.strict.idea.layout.Point
 import me.tbsten.koma.strict.idea.layout.Rect
 import me.tbsten.koma.strict.idea.layout.endpointRect
-import java.util.IdentityHashMap
 import kotlin.math.abs
 import kotlin.math.hypot
 
@@ -51,17 +49,18 @@ internal fun DrawScope.drawDiagram(
     colors: DiagramColors,
     tm: TextMeasurer,
     focus: FocusSet? = null,
+    sink: DiagramInteractionSink? = null,
 ) {
-    // フォーカス対象があるとき、対象外の要素は透明度を半分に落とす (`ide-2.md`)。focus==null は「未選択」で
+    // 描画のたびにラベル/弧の当たり判定ジオメトリを取り直す (`ide-3.md`)。
+    sink?.clear()
+    // フォーカス対象があるとき、対象外の要素は透明度を落とす (`ide-2.md`)。focus==null は「未選択」で
     // 全要素を通常描画する。ノード/エッジ/stay ごとの alpha を素朴な述語で決め、各描画へ乗算で伝える
     // (既存の STAY_ARC_ALPHA 等と二重適用にならないよう Color.dim は元の alpha に乗算する)。
     fun nodeAlpha(id: NodeId): Float = if (focus == null || focus.isNodeFocused(id)) 1f else FOCUS_DIM_ALPHA
     fun edgeAlpha(edge: GraphEdge): Float = if (focus == null || focus.isEdgeFocused(edge)) 1f else FOCUS_DIM_ALPHA
-    // composite 箱は「focus なノードを内包する」なら通常、そうでなければ減光する (構造の帰属を保つ)。
-    fun compositeAlpha(boxRect: Rect): Float = if (
-        focus == null ||
-        graph.nodes.any { focus.isNodeFocused(it.id) && layout.nodeRects[it.id]?.let { r -> boxRect.rectContains(r.center) } == true }
-    ) 1f else FOCUS_DIM_ALPHA
+    // composite 箱は「focus 集合に入っている (focus ノードを内包する / 選択された箱の subtree)」なら通常、
+    // そうでなければ減光する (`ide-3.md`。帰属は focusFrom が path ベースで解決済み)。
+    fun compositeAlpha(id: NodeId): Float = if (focus == null || focus.isCompositeFocused(id)) 1f else FOCUS_DIM_ALPHA
     val canvasPx = Size(layout.canvasSize.width.dp.toPx(), layout.canvasSize.height.dp.toPx())
     // root frame: store 全体を常に囲う角丸枠 (stay が無くても描く)。root scope の共有 stay は
     // この枠への self-loop として掛かる (any-state ノードの代替表現)。
@@ -92,7 +91,7 @@ internal fun DrawScope.drawDiagram(
     }
     for (box in graph.composites) {
         val r = layout.compositeRects[box.id] ?: continue
-        drawComposite(px(r), box.simpleName, colors, tm, compositeAlpha(r))
+        drawComposite(px(r), box.simpleName, colors, tm, compositeAlpha(box.id), focus?.isCompositeSelected(box.id) == true)
     }
     // エッジの線・矢印を先に描き、ラベルは最後にまとめて描く。
     // こうすることで長い recover ラベル等が発生源ノードの箱に隠れず、常にノードの上に読める
@@ -123,7 +122,7 @@ internal fun DrawScope.drawDiagram(
     }
     for (edge in graph.edges) {
         if (edge.fromId == edge.toId) continue
-        drawEdge(edge, colors, labels, arrows, pxRoutes, edgeAlpha(edge))
+        drawEdge(edge, colors, labels, arrows, pxRoutes, edgeAlpha(edge), focus?.isEdgeSelected(edge) == true)
     }
     // self-loop は「同一ノード × 同一種別 (enter/action/recover)」で 1 本の弧に集約し、ラベルは
     // 複数行で 1 枚にまとめる (5 本の stay ループが 1 ノードに密集して弧とラベルが絡む問題の対策)。
@@ -153,7 +152,12 @@ internal fun DrawScope.drawDiagram(
         val maxW = boxW?.let { (it - 16.0).dp.toPx() }
         // self-loop 群は「そのノードに接続するエッジ」なので、群のいずれかが focus なら群ごと通常描画。
         val loopAlpha = if (focus == null || groupEdges.any { focus.isEdgeFocused(it) }) 1f else FOCUS_DIM_ALPHA
-        drawSelfLoop(fromR, groupEdges, colors, labels, arrows, ordinal, usedFaces[nodeId].orEmpty(), loopPolylines, maxW, loopAlpha)
+        // 群のいずれかが選択されていれば弧ごと強調 (`ide-3.md`)。
+        val loopEmph = focus != null && groupEdges.any { focus.isEdgeSelected(it) }
+        drawSelfLoop(
+            fromR, groupEdges, colors, labels, arrows, ordinal, usedFaces[nodeId].orEmpty(),
+            loopPolylines, maxW, loopAlpha, loopEmph, sink,
+        )
     }
     // scope 共有の stay は scope の囲い (root frame / composite box) の右辺への self-loop。
     // any-state ノードの stay self-loop の代替表現 (ide.md)。種別ごとに 1 本の弧 + 集約ラベル。
@@ -172,8 +176,12 @@ internal fun DrawScope.drawDiagram(
         scopeOrdinal[scope] = ordinal + 1
         // scope 共有 stay 群は、群のいずれかが focus なら通常描画、そうでなければ減光する。
         val stayAlpha = if (focus == null || stays.any { focus.isScopeStayFocused(it) }) 1f else FOCUS_DIM_ALPHA
+        // 群のいずれかが選択されていれば弧ごと強調 (`ide-3.md`)。選択は代表 stay (群の先頭) に紐づける。
+        val stayEmph = focus != null && stays.any { focus.isStaySelected(it) }
+        val staySelection = DiagramSelection.Stay(stays.first())
         val color = colors.edgeColor(kind).copy(alpha = STAY_ARC_ALPHA).dim(stayAlpha)
         val dash = if (kind == EdgeKind.RECOVER) PathEffect.dashPathEffect(floatArrayOf(7f, 5f)) else null
+        val arrowScale = if (stayEmph) SELECTED_ARROW_SCALE else 1f
         // 右辺固定 (他 3 面を used 扱いにする)。枠が低い時は開口を面に収まる範囲へクランプ。
         val h = target.size.height
         val arc = selfLoopArc(
@@ -188,9 +196,14 @@ internal fun DrawScope.drawDiagram(
             labelGap = 4f.dp.toPx(),
             usedFaces = setOf(SelfLoopFace.TOP, SelfLoopFace.BOTTOM, SelfLoopFace.LEFT),
         )
-        // 弧の終端を barb 手前で止め、矢じりとの二重描画を無くす (`ide-2.md` #3)。
-        drawPath(trimmedArcPath(arc, ARROW_BARB.dp.toPx()), color = color, style = Stroke(width = 1.5f.dp.toPx(), pathEffect = dash))
-        arrows += PendingArrow(Offset(arc.endX, arc.endY), Offset(arc.arrowFromX, arc.arrowFromY), color)
+        // 弧の終端を barb 手前で止め、矢じりとの二重描画を無くす (`ide-2.md` #3)。選択時は太く。
+        val stayStroke = 1.5f * (if (stayEmph) SELECTED_EDGE_WIDTH_MULT else 1f)
+        drawPath(
+            trimmedArcPath(arc, ARROW_BARB.dp.toPx() * arrowScale),
+            color = color,
+            style = Stroke(width = stayStroke.dp.toPx(), pathEffect = dash),
+        )
+        arrows += PendingArrow(Offset(arc.endX, arc.endY), Offset(arc.arrowFromX, arc.arrowFromY), color, arrowScale)
         val arcPoly = (0..8).map { i ->
             val t = i / 8f
             val u = 1f - t
@@ -200,6 +213,8 @@ internal fun DrawScope.drawDiagram(
             )
         }
         loopPolylines += arcPoly
+        // 弧を当たり判定に登録し、scope-stay もクリックで選択できるようにする (`ide-3.md`)。
+        sink?.arcs?.add(staySelection to arcPoly)
         val text = stays.joinToString("\n") { it.label }
         if (text.isNotBlank()) {
             labels += PendingLabel(
@@ -212,26 +227,29 @@ internal fun DrawScope.drawDiagram(
                 // これで囲い / State の border を貫通せず、どの弧のラベルかも辿れる (`ide-2.md` #2)。
                 outwardDir = Offset(1f, 0f),
                 forceLeader = true,
+                selection = staySelection,
+                emphasized = stayEmph,
             )
         }
     }
     for (node in graph.nodes) {
         val r = layout.nodeRects[node.id]?.let { px(it) } ?: continue
         val a = nodeAlpha(node.id)
+        val selected = focus?.isNodeSelected(node.id) == true
         when (node) {
             is StartNode -> drawStart(r, colors, a)
             is StateGraphNode -> {
-                drawStateNode(r, node, colors, tm, a)
+                drawStateNode(r, node, colors, tm, a, selected)
                 node.exitBadge?.let { drawExitBadge(r, it, colors, tm, layout.direction, a) }
             }
             is AnyStateNode -> {
-                drawAnyNode(r, node.label, colors, tm, a)
+                drawAnyNode(r, node.label, colors, tm, a, selected)
                 node.exitBadge?.let { drawExitBadge(r, it, colors, tm, layout.direction, a) }
             }
         }
     }
-    // ノードの後に矢印ヘッドを描く = 先端がノードの枠に隠れず常に最前面に見える。
-    for (a in arrows) drawArrowHead(a.tip, a.from, a.color)
+    // ノードの後に矢印ヘッドを描く = 先端がノードの枠に隠れず常に最前面に見える。選択エッジは scale で拡大。
+    for (a in arrows) drawArrowHead(a.tip, a.from, a.color, a.scale)
     // 既に置いたラベル矩形を覚えておき、後続ラベルが重なるなら縦にずらして退避させる
     // (対向ペアの法線オフセットに加え、交差エッジ由来の団子状の重なりも解消する)。
     // ノード矩形はラベル配置の禁止領域: 不透明ピルが state 名やスタブ (線の根本) を覆わないようにする。
@@ -272,6 +290,7 @@ internal fun DrawScope.drawDiagram(
         drawEdgeLabel(
             label.text, label.pts, label.color, colors, tm, canvasPx, placed, nodeBoxes, allPolylines,
             label.maxWidthPx, label.ownLine, label.onLineAllowed, label.outwardDir, label.forceLeader,
+            label.emphasized, label.selection, sink,
         )
     }
 }
@@ -304,10 +323,14 @@ private class PendingLabel(
      * the thin leader keeps the pill off the border while still tying it to its arc.
      */
     val forceLeader: Boolean = false,
+    /** The selection a click on this pill makes (`ide-3.md`); null for a non-selectable label. */
+    val selection: DiagramSelection? = null,
+    /** True when this label's transition / stay is selected — the pill gets an accent border. */
+    val emphasized: Boolean = false,
 )
 
-/** An arrow head deferred until after the nodes are drawn so a node box never hides its tip. */
-private class PendingArrow(val tip: Offset, val from: Offset, val color: Color)
+/** An arrow head deferred until after the nodes are drawn so a node box never hides its tip. [scale] enlarges a selected edge's head. */
+private class PendingArrow(val tip: Offset, val from: Offset, val color: Color, val scale: Float = 1f)
 
 // stay (self transition) の弧・矢じりの透明度。本流の遷移より一段引かせるが、薄すぎて潰れない程度に
 // ほんの少し濃くする (`ide-2.md` #1)。
@@ -319,14 +342,41 @@ internal const val STAY_LABEL_ALPHA = 0.62f
 // 矢じり (三角形) の付け根までの長さ (dp)。線はこの手前で止め、tip での二重描画を無くす (`ide-2.md` #3)。
 internal const val ARROW_BARB = 9f
 
-// フォーカス対象外の要素の減光係数 (`ide-2.md`: 透明度を半分に落とす)。元 alpha に乗算する。
-internal const val FOCUS_DIM_ALPHA = 0.5f
+// フォーカス対象外の要素の減光係数 (`ide-2.md`: 透明度を落とす)。元 alpha に乗算する。
+internal const val FOCUS_DIM_ALPHA = 0.15f
+
+// 選択そのもの (tier 1) の強調パラメータ (`ide-3.md`)。強調色はテーマ accent。
+// State / composite は accent border で囲い、Transition は線を太く + ラベルを accent 枠で囲う。
+internal const val SELECTED_NODE_BORDER_DP = 2.5f
+internal const val SELECTED_EDGE_WIDTH_MULT = 2.5f
+internal const val SELECTED_ARROW_SCALE = 1.6f
+
+/**
+ * Draw-time geometry captured so the tap handler can hit-test labels and self-loop / scope-stay arcs,
+ * whose final placement is only known while drawing (collision-avoided labels, arc apexes). All
+ * coordinates are the pre-scale px of [drawDiagram]; the caller compares against `offset / renderZoom`.
+ * Cleared and refilled on every draw pass.
+ */
+internal class DiagramInteractionSink {
+    /** Label pill rectangles → the selection a click inside makes (an [DiagramSelection.Edge] / [DiagramSelection.Stay]). */
+    val labelBoxes = mutableListOf<Pair<DiagramSelection, PxBox>>()
+
+    /** Self-loop / scope-stay arc poly-lines → their selection (distance-tested like an edge line). */
+    val arcs = mutableListOf<Pair<DiagramSelection, List<Offset>>>()
+
+    fun clear() {
+        labelBoxes.clear()
+        arcs.clear()
+    }
+}
+
+/** An axis-aligned px rectangle for sink hit-testing. */
+internal class PxBox(val left: Float, val top: Float, val w: Float, val h: Float) {
+    fun contains(x: Float, y: Float): Boolean = x >= left && x <= left + w && y >= top && y <= top + h
+}
 
 /** Multiplies this color's existing alpha by [factor] (1f = unchanged) — the focus dimming step. */
 private fun Color.dim(factor: Float): Color = if (factor >= 1f) this else copy(alpha = alpha * factor)
-
-/** True when [p] lies inside this rect (border excluded) — used to test composite membership for focus. */
-private fun Rect.rectContains(p: Point): Boolean = p.x > x && p.x < right && p.y > y && p.y < bottom
 
 /** The node face a border port [p] sits on (null when the point is not on [r]'s border). */
 private fun borderFace(r: PxRect, p: Offset): SelfLoopFace? {
@@ -348,12 +398,21 @@ private class LabelBox(val left: Float, val top: Float, val w: Float, val h: Flo
 
 // ---- nodes ----
 
-private fun DrawScope.drawStateNode(r: PxRect, node: StateGraphNode, colors: DiagramColors, tm: TextMeasurer, alpha: Float = 1f) {
+private fun DrawScope.drawStateNode(
+    r: PxRect,
+    node: StateGraphNode,
+    colors: DiagramColors,
+    tm: TextMeasurer,
+    alpha: Float = 1f,
+    selected: Boolean = false,
+) {
     val fill = (if (node.reachable) colors.nodeFill else colors.warningFill).dim(alpha)
-    val border = (if (node.reachable) colors.nodeBorder else colors.warningBorder).dim(alpha)
+    // 選択時は accent border で太く囲う (`ide-3.md` tier 1)。選択ノードは常に alpha=1 なので dim しない。
+    val border = if (selected) colors.accent else (if (node.reachable) colors.nodeBorder else colors.warningBorder).dim(alpha)
+    val borderW = if (selected) SELECTED_NODE_BORDER_DP else 1.5f
     val text = (if (node.reachable) colors.nodeText else colors.warningText).dim(alpha)
     drawRoundRect(color = fill, topLeft = r.topLeft, size = r.size, cornerRadius = corner(10f))
-    drawRoundRect(color = border, topLeft = r.topLeft, size = r.size, cornerRadius = corner(10f), style = Stroke(width = 1.5f.dp.toPx()))
+    drawRoundRect(color = border, topLeft = r.topLeft, size = r.size, cornerRadius = corner(10f), style = Stroke(width = borderW.dp.toPx()))
     drawCentered(tm, node.simpleName, r, text, 12.sp, FontWeight.Medium)
 }
 
@@ -392,13 +451,37 @@ private fun DrawScope.drawStart(r: PxRect, colors: DiagramColors, alpha: Float =
     drawCircle(color = colors.startFill.dim(alpha), radius = radius, center = r.center)
 }
 
-private fun DrawScope.drawAnyNode(r: PxRect, label: String, colors: DiagramColors, tm: TextMeasurer, alpha: Float = 1f) {
+private fun DrawScope.drawAnyNode(
+    r: PxRect,
+    label: String,
+    colors: DiagramColors,
+    tm: TextMeasurer,
+    alpha: Float = 1f,
+    selected: Boolean = false,
+) {
     // any-state 擬似ノードは枠なし (塗りと文字だけ)。実 state との違いは「枠が無い」ことで表す。
     drawRoundRect(color = colors.anyFill.dim(alpha), topLeft = r.topLeft, size = r.size, cornerRadius = corner(24f))
+    // 選択時だけ accent border を足して強調 (`ide-3.md` tier 1)。
+    if (selected) {
+        drawRoundRect(
+            color = colors.accent,
+            topLeft = r.topLeft,
+            size = r.size,
+            cornerRadius = corner(24f),
+            style = Stroke(width = SELECTED_NODE_BORDER_DP.dp.toPx()),
+        )
+    }
     drawCentered(tm, label, r, colors.anyText.dim(alpha), 11.sp, FontWeight.Normal)
 }
 
-private fun DrawScope.drawComposite(r: PxRect, name: String, colors: DiagramColors, tm: TextMeasurer, alpha: Float = 1f) {
+private fun DrawScope.drawComposite(
+    r: PxRect,
+    name: String,
+    colors: DiagramColors,
+    tm: TextMeasurer,
+    alpha: Float = 1f,
+    selected: Boolean = false,
+) {
     // nest state (composite) は半透明の灰背景で「領域」を面として見せる (入れ子は自然に濃くなる)。
     drawRoundRect(
         color = colors.compositeBorder.copy(alpha = 0.08f).dim(alpha),
@@ -406,12 +489,15 @@ private fun DrawScope.drawComposite(r: PxRect, name: String, colors: DiagramColo
         size = r.size,
         cornerRadius = corner(12f),
     )
+    // 選択時は accent border で太く囲う (`ide-3.md` tier 1)。
+    val border = if (selected) colors.accent else colors.compositeBorder.dim(alpha)
+    val borderW = if (selected) SELECTED_NODE_BORDER_DP else 1.2f
     drawRoundRect(
-        color = colors.compositeBorder.dim(alpha),
+        color = border,
         topLeft = r.topLeft,
         size = r.size,
         cornerRadius = corner(12f),
-        style = Stroke(width = 1.2f.dp.toPx()),
+        style = Stroke(width = borderW.dp.toPx()),
     )
     val laid = tm.measure(name, TextStyle(color = colors.compositeLabel.dim(alpha), fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
     drawText(laid, topLeft = Offset(r.topLeft.x + 8f.dp.toPx(), r.topLeft.y + 5f.dp.toPx()))
@@ -426,6 +512,7 @@ private fun DrawScope.drawEdge(
     arrows: MutableList<PendingArrow>,
     pxRoutes: Map<GraphEdge, List<Offset>>,
     alpha: Float = 1f,
+    emphasized: Boolean = false,
 ) {
     val color = colors.edgeColor(edge.kind).dim(alpha)
     // recover (@OnRecover) は横断的なエラー処理なので破線で通常遷移と見分ける (ide.all.md §5)。
@@ -434,21 +521,30 @@ private fun DrawScope.drawEdge(
     // composite title strip を貫かない (直線で足りるエッジは 2 点 = 従来と同一の直線)。
     val pts = pxRoutes[edge] ?: return
     if (pts.size < 2) return
+    // 選択エッジ (tier 1) は線を太く・矢じりを拡大する (`ide-3.md`)。色は kind 色のまま (accent は border/ラベル枠のみ)。
+    val arrowScale = if (emphasized) SELECTED_ARROW_SCALE else 1f
+    val strokeW = 1.5f * (if (emphasized) SELECTED_EDGE_WIDTH_MULT else 1f)
     // 線は arrowhead の付け根 (tip から barb 手前) で止める: 矢じり三角形と線本体の二重描画を無くし、
     // 半透明 stay でも tip の重なりが濃くならない (`ide-2.md` #3)。矢じりは元の tip/向きで描くので、
     // 不透明エッジの見た目 (矢印がノード境界にきっちり刺さる) は不変。
-    val drawPts = trimPolylineEnd(pts, ARROW_BARB.dp.toPx())
+    val drawPts = trimPolylineEnd(pts, ARROW_BARB.dp.toPx() * arrowScale)
     for (i in 0 until drawPts.size - 1) {
-        drawLine(color = color, start = drawPts[i], end = drawPts[i + 1], strokeWidth = 1.5f.dp.toPx(), pathEffect = dash)
+        drawLine(color = color, start = drawPts[i], end = drawPts[i + 1], strokeWidth = strokeW.dp.toPx(), pathEffect = dash)
     }
     val end = pts.last()
     val beforeEnd = pts[pts.size - 2]
     // 矢印は最終区間の向きで target 面に刺す (arrowhead-on-top は node 描画後に描かれる)。
-    arrows += PendingArrow(end, beforeEnd, color)
+    arrows += PendingArrow(end, beforeEnd, color, arrowScale)
     edge.label.takeIf { it.isNotBlank() }?.let { text ->
         // ラベルは全エッジに付ける (fan-out も 1 本ずつ別の直線なので各自のラベルが要る)。
-        // 位置決め・衝突回避 (ノード / 他の線 / 既置ラベル) は drawEdgeLabel 側。
-        labels += PendingLabel(text, pts, labelColor(edge, colors).dim(alpha))
+        // 位置決め・衝突回避 (ノード / 他の線 / 既置ラベル) は drawEdgeLabel 側。ラベルクリックでこのエッジを選択。
+        labels += PendingLabel(
+            text,
+            pts,
+            labelColor(edge, colors).dim(alpha),
+            selection = DiagramSelection.Edge(edge),
+            emphasized = emphasized,
+        )
     }
 }
 
@@ -476,8 +572,13 @@ private fun DrawScope.drawSelfLoop(
     loopPolylines: MutableList<List<Offset>>,
     labelMaxWidthPx: Float?,
     alpha: Float = 1f,
+    emphasized: Boolean = false,
+    sink: DiagramInteractionSink? = null,
 ) {
     val kind = edges.first().kind
+    // 選択された self-loop (tier 1) は弧を太く・矢じりを拡大する (`ide-3.md`)。選択はこの弧の代表エッジに紐づく。
+    val loopSelection = DiagramSelection.Edge(edges.first())
+    val arrowScale = if (emphasized) SELECTED_ARROW_SCALE else 1f
     // stay (self-loop) は本流の遷移より一段引かせる: 弧・矢じりをうっすら半透明にして、
     // 図の骨格 (state 間遷移) が先に目に入るようにする (透明度は STAY_ARC_ALPHA / STAY_LABEL_ALPHA)。
     // focus 減光 (alpha) は元の stay 透明度に乗算する (二重適用を避ける)。
@@ -498,9 +599,14 @@ private fun DrawScope.drawSelfLoop(
         labelGap = 4f.dp.toPx(),
         usedFaces = usedFaces,
     )
-    // 弧も終端を barb 手前で止め、矢じりとの二重描画を無くす (`ide-2.md` #3)。矢じりは元の tip で描く。
-    drawPath(trimmedArcPath(arc, ARROW_BARB.dp.toPx()), color = color, style = Stroke(width = 1.5f.dp.toPx(), pathEffect = dash))
-    arrows += PendingArrow(Offset(arc.endX, arc.endY), Offset(arc.arrowFromX, arc.arrowFromY), color)
+    // 弧も終端を barb 手前で止め、矢じりとの二重描画を無くす (`ide-2.md` #3)。矢じりは元の tip で描く。選択時は太く。
+    val loopStroke = 1.5f * (if (emphasized) SELECTED_EDGE_WIDTH_MULT else 1f)
+    drawPath(
+        trimmedArcPath(arc, ARROW_BARB.dp.toPx() * arrowScale),
+        color = color,
+        style = Stroke(width = loopStroke.dp.toPx(), pathEffect = dash),
+    )
+    arrows += PendingArrow(Offset(arc.endX, arc.endY), Offset(arc.arrowFromX, arc.arrowFromY), color, arrowScale)
     // 弧を折れ線に近似してラベル配置の障害物に登録する (他のラベルのピルが弧を覆い隠さないように)。
     val arcPoly = (0..8).map { i ->
         val t = i / 8f
@@ -511,6 +617,8 @@ private fun DrawScope.drawSelfLoop(
         )
     }
     loopPolylines += arcPoly
+    // 弧を当たり判定に登録し、node self-loop もクリックで選択できるようにする (`ide-3.md`)。
+    sink?.arcs?.add(loopSelection to arcPoly)
     // 上下面 (TOP/BOTTOM) のループはピルが弧より横に広く、内側 (ノード寄り) に置くと弧の脚を覆って
     // 扁平に見える。弧の頂点方向 = ノードから離れる向きを outward として渡し、ピルを常に弧の外側へ
     // 逃がす (左右面は開口が縦なので 1 行ピルが脚を覆わず、従来通り null = 現状維持)。
@@ -551,6 +659,8 @@ private fun DrawScope.drawSelfLoop(
             onLineAllowed = false,
             outwardDir = outward,
             forceLeader = forceLeader,
+            selection = loopSelection,
+            emphasized = emphasized,
         )
     }
 }
@@ -743,14 +853,15 @@ private fun trimmedArcPath(arc: SelfLoopArc, cut: Float): Path {
     }
 }
 
-private fun DrawScope.drawArrowHead(tip: Offset, from: Offset, color: Color) {
+private fun DrawScope.drawArrowHead(tip: Offset, from: Offset, color: Color, scale: Float = 1f) {
     val dx = tip.x - from.x
     val dy = tip.y - from.y
     val len = hypot(dx, dy).takeIf { it > 0.0001f } ?: return
     val ux = dx / len
     val uy = dy / len
-    val barb = ARROW_BARB.dp.toPx()
-    val half = 4.5f.dp.toPx()
+    // 選択エッジ (`ide-3.md`) は矢じりを scale で拡大する (太線と釣り合わせる)。
+    val barb = ARROW_BARB.dp.toPx() * scale
+    val half = 4.5f.dp.toPx() * scale
     val baseX = tip.x - ux * barb
     val baseY = tip.y - uy * barb
     val px = -uy
@@ -779,6 +890,9 @@ private fun DrawScope.drawEdgeLabel(
     onLineAllowed: Boolean = true,
     outwardDir: Offset? = null,
     forceLeader: Boolean = false,
+    emphasized: Boolean = false,
+    selection: DiagramSelection? = null,
+    sink: DiagramInteractionSink? = null,
 ) {
     if (pts.isEmpty()) return
     // ラベル中心は線の開始点 (source ポート = pts[0]) から最低 12dp 離す (`ide-2.md` #7): 開始点に
@@ -933,7 +1047,19 @@ private fun DrawScope.drawEdgeLabel(
         size = Size(box.w, box.h),
         cornerRadius = corner(4f),
     )
+    // 選択された Transition / stay のラベルは accent border で囲う (`ide-3.md` tier 1)。
+    if (emphasized) {
+        drawRoundRect(
+            color = colors.accent,
+            topLeft = Offset(box.left, box.top),
+            size = Size(box.w, box.h),
+            cornerRadius = corner(4f),
+            style = Stroke(width = 1.5f.dp.toPx()),
+        )
+    }
     drawText(laid, topLeft = Offset(bx - w / 2, by - h / 2))
+    // 確定したラベル矩形を当たり判定に登録し、ラベルクリックでその遷移を選択できるようにする (`ide-3.md`)。
+    if (selection != null) sink?.labelBoxes?.add(selection to PxBox(box.left, box.top, box.w, box.h))
 }
 
 /** Total length of poly-line [pts] (0 for a single point). */

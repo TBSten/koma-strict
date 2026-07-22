@@ -34,8 +34,9 @@ internal fun copyDiagramImageToClipboard(
     density: Density,
     layoutDirection: LayoutDirection,
     textMeasurer: TextMeasurer,
+    focus: FocusSet? = null,
 ): Boolean = try {
-    val image = renderDiagramImage(graph, layout, colors, density, layoutDirection, textMeasurer)
+    val image = renderDiagramImage(graph, layout, colors, density, layoutDirection, textMeasurer, focus)
     // ヘッドレス環境 (preview) では Toolkit / clipboard アクセスが例外を投げるので try 全体で握りつぶす。
     Toolkit.getDefaultToolkit().systemClipboard.setContents(ImageTransferable(image), null)
     true
@@ -57,6 +58,7 @@ internal fun renderDiagramImage(
     density: Density,
     layoutDirection: LayoutDirection,
     textMeasurer: TextMeasurer,
+    focus: FocusSet? = null,
 ): Image {
     // 異常モデルでも巨大/非有限サイズで落ちないよう canvas と同じ流儀でクランプする (dp 単位)。
     val wDp = clampDp(layout.canvasSize.width)
@@ -72,7 +74,8 @@ internal fun renderDiagramImage(
         // 透明のままにせず必ず背景色で塗る (貼り付け先の地色に依存させない)。
         drawRect(color = colors.background)
         scale(fit, pivot = Offset.Zero) {
-            drawDiagram(graph, layout, colors, textMeasurer)
+            // focus を渡すと選択強調 + 減光まで焼き込む (`ide-3.md`)。sink は copy では不要。
+            drawDiagram(graph, layout, colors, textMeasurer, focus)
         }
     }
     return bitmap.toAwtImage()

@@ -82,6 +82,9 @@ fun KomaStrictToolWindowContent(
         var zoom by remember { mutableStateOf(1f) }
 
         val model = stores[selected.coerceIn(0, stores.lastIndex)]
+        // フォーカス選択は tool window 側で保持する (StoreDiagram は制御された view)。こうすることで
+        // "Copy image" が現在の focus 状態を焼き込んでコピーできる (`ide-3.md`)。図が変わればリセット。
+        var selection by remember(model, direction) { mutableStateOf(emptySet<DiagramSelection>()) }
         // 図の構築 (lowering + layout) を保護する。半端/異常なモデルで例外が飛んでも composition を
         // 巻き添えにして固まらせない。失敗時は Diagram タブにだけエラーを出し、ヘッダ (Reload / 表切替)
         // は生かして復帰の導線を残す。ただし runCatching (= Throwable 全捕捉) は使わない: 協調キャンセル
@@ -105,7 +108,9 @@ fun KomaStrictToolWindowContent(
         val composeLayoutDirection = LocalLayoutDirection.current
         val copyTextMeasurer = rememberTextMeasurer()
         val onCopyImage: (() -> Boolean)? = prepared.getOrNull()?.let { (graph, graphLayout) ->
-            {
+            // 選択があれば focus を焼き込む (フォーカス状態のままコピー)。無ければ従来通り全体を通常描画。
+            val copyFocus = selection.takeIf { it.isNotEmpty() }?.let { sel -> graph.focusFrom(sel) }
+            val action: () -> Boolean = {
                 copyDiagramImageToClipboard(
                     graph = graph,
                     layout = graphLayout,
@@ -113,8 +118,10 @@ fun KomaStrictToolWindowContent(
                     density = density,
                     layoutDirection = composeLayoutDirection,
                     textMeasurer = copyTextMeasurer,
+                    focus = copyFocus,
                 )
             }
+            action
         }
 
         Header(
@@ -145,6 +152,8 @@ fun KomaStrictToolWindowContent(
                         zoom = zoom,
                         // ピンチ / Ctrl+ホイールの倍率を zoom に畳み込む (ボタンと同じ 0.5〜2.5 に制限)。
                         onZoomBy = { factor -> zoom = (zoom * factor).coerceIn(0.5f, 2.5f) },
+                        selection = selection,
+                        onSelectionChange = { selection = it },
                     )
                 },
                 onFailure = { RenderErrorGuidance(it, colors) },
