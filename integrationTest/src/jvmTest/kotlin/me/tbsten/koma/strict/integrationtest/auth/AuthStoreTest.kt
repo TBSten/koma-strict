@@ -36,7 +36,7 @@ class AuthStoreTest {
         runStoreTest {
             createStore(restoreSession = { null }).useStore {
                 startAndAwait()
-                assertEquals(AuthState.LoggedOut, currentState)
+                assertEquals(AuthState.LoggedOut(), currentState)
             }
         }
 
@@ -62,7 +62,7 @@ class AuthStoreTest {
                 record { recorder ->
                     startAndAwait()
                     dispatchAndAwait(AuthAction.Login(userName = "alice", password = "pw"))
-                    assertEquals(AuthState.LoggedOut, currentState)
+                    assertEquals(AuthState.LoggedOut(), currentState)
                     // enter 内の emit (LoginFailed) → 離脱時の exit emit (AuthAttemptFinished) の順
                     assertEquals(
                         listOf(
@@ -93,7 +93,7 @@ class AuthStoreTest {
             createStore(restoreSession = { throw SessionExpiredException() }).useStore {
                 record { recorder ->
                     startAndAwait() // CheckingSession の enter が投げ、recover が同期チェーンで処理する
-                    assertEquals(AuthState.LoggedOut, currentState)
+                    assertEquals(AuthState.LoggedOut(), currentState)
                     assertEquals(listOf<AuthEvent>(AuthEvent.SessionExpired), recorder.events)
                 }
             }
@@ -105,7 +105,7 @@ class AuthStoreTest {
             createStore(restoreSession = { Session(userName = "alice") }).useStore {
                 startAndAwait()
                 dispatchAndAwait(AuthAction.Logout)
-                assertEquals(AuthState.LoggedOut, currentState)
+                assertEquals(AuthState.LoggedOut(), currentState)
             }
         }
 }

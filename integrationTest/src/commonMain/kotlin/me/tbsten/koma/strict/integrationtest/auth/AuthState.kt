@@ -22,10 +22,14 @@ internal sealed interface AuthState : State {
     companion object
 
     @OnEnter(nextState = [LoggedIn::class, LoggedOut::class])
-    data object CheckingSession : AuthState // initial(到達不能分析の起点)
+    interface CheckingSession : AuthState { // initial(到達不能分析の起点)
+        companion object
+    }
 
     @OnAction<AuthAction.Login>(nextState = [Authenticating::class])
-    data object LoggedOut : AuthState
+    interface LoggedOut : AuthState {
+        companion object
+    }
 
     @OnEnter(nextState = [LoggedIn::class, LoggedOut::class], emit = [AuthEvent.LoginFailed::class])
     @OnExit(emit = [AuthEvent.AuthAttemptFinished::class]) // 離脱時に必ず通知

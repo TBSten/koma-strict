@@ -19,43 +19,42 @@ internal fun createAuthStore(
     restoreSession: suspend () -> Session?,
     authenticate: suspend (userName: String) -> Unit,
 ): Store<AuthState, AuthAction, AuthEvent> =
-    Store<AuthState, AuthAction, AuthEvent>(initialState = AuthState.CheckingSession) {
-        states(
-            default = AuthState.actions(
-                // param 名は recover{Exception}(仮確定)。scope には error: SessionExpiredException
-                recoverSessionExpiredException = {
-                    emitSessionExpired()
+    authStore(
+        initialState = AuthState.CheckingSession(),
+        default = AuthState.actions(
+            // param 名は recover{Exception}(仮確定)。scope には error: SessionExpiredException
+            recoverSessionExpiredException = {
+                emitSessionExpired()
+                nextState.toLoggedOut()
+            },
+        ),
+        checkingSession = AuthState.CheckingSession.actions(
+            enter = {
+                // restoreSession() が SessionExpiredException を投げたら root の @OnRecover が拾う
+                val session = restoreSession()
+                if (session != null) {
+                    nextState.toLoggedIn(userName = session.userName)
+                } else {
                     nextState.toLoggedOut()
-                },
-            ),
-            checkingSession = AuthState.CheckingSession.actions(
-                enter = {
-                    // restoreSession() が SessionExpiredException を投げたら root の @OnRecover が拾う
-                    val session = restoreSession()
-                    if (session != null) {
-                        nextState.toLoggedIn(userName = session.userName)
-                    } else {
+                }
+            },
+        ),
+        loggedOut = AuthState.LoggedOut.actions(
+            login = { nextState.toAuthenticating(userName = action.userName) }, // 入力の取り込みは明示
+        ),
+        authenticating = AuthState.Authenticating.actions(
+            enter = {
+                runCatching { authenticate(state.userName) }.fold(
+                    onSuccess = { nextState.toLoggedIn() }, // userName は持ち越し
+                    onFailure = {
+                        emitLoginFailed(it.message)
                         nextState.toLoggedOut()
-                    }
-                },
-            ),
-            loggedOut = AuthState.LoggedOut.actions(
-                login = { nextState.toAuthenticating(userName = action.userName) }, // 入力の取り込みは明示
-            ),
-            authenticating = AuthState.Authenticating.actions(
-                enter = {
-                    runCatching { authenticate(state.userName) }.fold(
-                        onSuccess = { nextState.toLoggedIn() }, // userName は持ち越し
-                        onFailure = {
-                            emitLoginFailed(it.message)
-                            nextState.toLoggedOut()
-                        },
-                    )
-                },
-                exit = { emitAuthAttemptFinished() }, // 戻り値なし(遷移能力がない)
-            ),
-            loggedIn = AuthState.LoggedIn.actions(
-                logout = { nextState.toLoggedOut() },
-            ),
-        )
-    }
+                    },
+                )
+            },
+            exit = { emitAuthAttemptFinished() }, // 戻り値なし(遷移能力がない)
+        ),
+        loggedIn = AuthState.LoggedIn.actions(
+            logout = { nextState.toLoggedOut() },
+        ),
+    )
