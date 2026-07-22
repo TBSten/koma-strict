@@ -56,6 +56,23 @@ class DiagramFocusTest {
         graph.edges.first { it.fromId == from && it.toId == to }
 
     @Test
+    fun `nextSelection のタップ意味論 (ide-3)`() {
+        val a = DiagramSelection.Node(NodeId.state("A"))
+        val b = DiagramSelection.Node(NodeId.state("B"))
+        // 通常クリックは単一選択に置換。
+        assertEquals(setOf(a), nextSelection(setOf(b), a, shift = false, clickedEmpty = false))
+        // 空クリック (何も navigable でない) で全解除。
+        assertEquals(emptySet<DiagramSelection>(), nextSelection(setOf(a, b), null, shift = false, clickedEmpty = true))
+        // navigable だが focus 対象でない (hit=null かつ clickedEmpty=false) は選択維持。
+        assertEquals(setOf(a), nextSelection(setOf(a), null, shift = false, clickedEmpty = false))
+        // Shift はトグル: 未選択なら追加、既選択なら除去。
+        assertEquals(setOf(a, b), nextSelection(setOf(a), b, shift = true, clickedEmpty = false))
+        assertEquals(setOf(b), nextSelection(setOf(a, b), a, shift = true, clickedEmpty = false))
+        // Shift + 空クリックは維持 (誤解除しない)。
+        assertEquals(setOf(a), nextSelection(setOf(a), null, shift = true, clickedEmpty = true))
+    }
+
+    @Test
     fun `node 選択で入出力エッジとその相手ノードだけが focus に入る`() {
         val graph = GraphLowering.lower(abcModel())
         val a = NodeId.state("A")

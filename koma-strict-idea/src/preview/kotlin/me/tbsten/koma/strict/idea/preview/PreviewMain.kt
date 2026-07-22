@@ -21,6 +21,8 @@ import me.tbsten.koma.strict.idea.ui.DiagramSelection
 import me.tbsten.koma.strict.idea.ui.KomaStrictToolWindowContent
 import me.tbsten.koma.strict.idea.ui.StoreDiagram
 import me.tbsten.koma.strict.idea.ui.rememberDiagramColors
+import me.tbsten.koma.strict.idea.ui.rememberSelectionState
+import me.tbsten.koma.strict.idea.ui.rememberZoomState
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.skia.EncodedImageFormat
@@ -161,7 +163,7 @@ private fun renderAll(outDir: File) {
     render(outDir, "zoom", 980, 460, dark = false) {
         val g = GraphLowering.lower(SampleModels.lce())
         val l = LayeredLayout.layout(g, LayoutDirection.LR, LayoutConfig(layerGap = 208.0, siblingGap = 60.0))
-        StoreDiagram(graph = g, layout = l, colors = rememberDiagramColors(), zoom = 1.6f)
+        StoreDiagram(graph = g, layout = l, colors = rememberDiagramColors(), zoomState = rememberZoomState(1.6f))
     }
     // cap を超える巨大な図 (長い LR chain): auto-fit で全体が canvas 内に収まって tail が無言 clip されず、
     // oversize バナーが縮小理由と「情報は欠落していない」ことを明示することを確認する (P1-08)。
@@ -243,7 +245,7 @@ private fun DiagramLrPreview(model: StoreDiagramModel) {
 private fun DiagramLrFocusPreview(model: StoreDiagramModel, selection: (DiagramGraph) -> Set<DiagramSelection>) {
     val graph = GraphLowering.lower(model)
     val layout = LayeredLayout.layout(graph, LayoutDirection.LR, LayoutConfig(layerGap = 208.0, siblingGap = 60.0))
-    StoreDiagram(graph = graph, layout = layout, colors = rememberDiagramColors(), selection = selection(graph))
+    StoreDiagram(graph = graph, layout = layout, colors = rememberDiagramColors(), selectionState = rememberSelectionState(selection(graph)))
 }
 
 private fun render(outDir: File, name: String, width: Int, height: Int, dark: Boolean, content: @Composable () -> Unit) {

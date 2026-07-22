@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
@@ -27,8 +28,10 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import me.tbsten.koma.strict.idea.ir.DiagramGraph
+import me.tbsten.koma.strict.idea.ir.GraphEdge
 import me.tbsten.koma.strict.idea.layout.EdgeRouting
 import me.tbsten.koma.strict.idea.layout.GraphLayout
+import me.tbsten.koma.strict.idea.layout.Point
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.ui.component.OversizeBanner
 import kotlin.math.hypot
@@ -40,23 +43,19 @@ import kotlin.math.hypot
  * canvas is sized to the layout's own extent and lives inside both scroll axes, so a diagram larger
  * than the tool window scrolls rather than clipping. All rendering is delegated to [drawDiagram].
  *
- * [zoom] is the *requested* zoom (buttons + pinch). The Compose/Skiko canvas can't grow past
+ * [zoomState] is the *requested* zoom (buttons + pinch). The Compose/Skiko canvas can't grow past
  * [MAX_CANVAS_EXTENT], so a figure whose `layout × zoom` would exceed it is **auto-fit** ([fitDiagram]):
  * the render zoom is lowered until the whole figure fits, so no node/edge is ever drawn past the
  * scrollable area and silently clipped (`ide-review.md` P1-08). When that happens an [OversizeBanner]
- * tells the user the figure was scaled to fit rather than dropping part of it. [onZoomBy] reports a
- * multiplicative zoom delta from a trackpad/touch pinch or a `Ctrl`/`Cmd` + wheel, which the caller
- * folds into [zoom] (clamped).
+ * tells the user the figure was scaled to fit. Pinch / `Ctrl`+wheel nudge [zoomState] via [pinchZoom] /
+ * [ctrlWheelZoom].
  *
- * A single tap also drives **focus** (`ide-2.md` / `ide-3.md`): tapping a state frame, a transition
- * arrow, a nest-state box, or a stay arc selects it and dims every element outside its focus set (see
- * [focusFrom] / [hitElement] + the draw-time [DiagramInteractionSink] for labels / arcs). **Shift**-tap
- * toggles a target into a multi-selection; a plain tap on empty space clears it. The selected element
- * is emphasized (tier 1), directly-connected ones stay normal (tier 2), the rest dim (tier 3). Focus and
- * click-to-declaration coexist — a tap sets focus *and* still fires [onNavigate] when it lands on
- * something navigable. [selection] is hoisted state (the tool window owns it so "Copy image" can
- * render the focused figure); [onSelectionChange] reports a tap's new selection. A headless preview
- * passes a fixed [selection] and no [onSelectionChange].
+ * A single tap also drives **focus** (`ide-2.md` / `ide-3.md`) via [diagramTapSelection]: tapping a
+ * state frame, a transition arrow, a nest-state box, or a stay arc selects it (Shift toggles a
+ * multi-selection; a plain tap on empty space clears it) and dims everything outside its focus set.
+ * [selectionState] is hoisted (the tool window owns it so "Copy image" can render the focused figure);
+ * focus and click-to-declaration coexist — a tap updates [selectionState] *and* still fires [onNavigate]
+ * on a navigable hit.
  */
 @Composable
 fun StoreDiagram(
@@ -65,37 +64,31 @@ fun StoreDiagram(
     colors: DiagramColors,
     modifier: Modifier = Modifier,
     onNavigate: (SourceAnchor) -> Unit = {},
-    zoom: Float = 1f,
-    onZoomBy: (Float) -> Unit = {},
-    selection: Set<DiagramSelection> = emptySet(),
-    onSelectionChange: (Set<DiagramSelection>) -> Unit = {},
+    zoomState: ZoomState = rememberZoomState(),
+    selectionState: SelectionState = rememberSelectionState(),
 ) {
     val tm = rememberTextMeasurer()
-    // pointerInput は key(graph, layout, renderZoom) 変化時しか再起動しないので、コールバックと選択は
-    // rememberUpdatedState 経由で常に最新を読む (古いクロージャを掴む Compose フットガンを防ぐ)。
-    val latestOnNavigate by rememberUpdatedState(onNavigate)
-    val latestOnZoomBy by rememberUpdatedState(onZoomBy)
-    val latestSelection by rememberUpdatedState(selection)
-    val latestOnSelectionChange by rememberUpdatedState(onSelectionChange)
-    // Shift 併用 (複数選択) 判定のため window の keyboard modifiers を tap 時に読む。
-    val windowInfo = LocalWindowInfo.current
     // エッジ当たり判定用のルート (dp)。描画側 drawDiagram も同じ routeAll を使うので判定と描画が一致する
-    // (routeAll は純関数で決定的なので別計算でも同一結果)。
+    // (routeAll は純関数で決定的なので別計算でも同一結果)。tap 当たり判定にも渡す。
     val routes = remember(graph, layout) { EdgeRouting.routeAll(graph, layout) }
     // フォーカス集合。選択が空なら null = 全要素を通常描画 (既存の見た目)。
-    val focus = remember(graph, selection) { selection.takeIf { it.isNotEmpty() }?.let { graph.focusFrom(it) } }
+    val focus = remember(graph, selectionState.selection) {
+        selectionState.selection.takeIf { it.isNotEmpty() }?.let { graph.focusFrom(it) }
+    }
     // ラベル矩形・自己ループ/scope-stay 弧の描画時ジオメトリを毎フレーム受け取り、tap の当たり判定に使う。
     val sink = remember(graph, layout) { DiagramInteractionSink() }
     // cap を超える図は auto-fit で全体を canvas 内へ収める。以降は renderZoom (= 実描画倍率) で統一し、
     // 描画・hit-test・canvas サイズが一致するようにする (無言 clip を禁止)。
-    val fit = fitDiagram(layout.canvasSize.width, layout.canvasSize.height, zoom)
+    val fit = fitDiagram(layout.canvasSize.width, layout.canvasSize.height, zoomState.zoom)
     val renderZoom = fit.renderZoom
     // 異常なモデルでも canvas 生成で落ちない/固まらないよう、寸法を有限・正の範囲にクランプする。
     val canvasW = safeExtent(layout.canvasSize.width * renderZoom)
     val canvasH = safeExtent(layout.canvasSize.height * renderZoom)
+    // tap の当たり判定に要る入力を 1 つにまとめて引数を読みやすくする。
+    val hitContext = DiagramHitContext(graph, layout, routes, sink, renderZoom)
     Column(modifier = modifier.fillMaxSize()) {
         // auto-fit で要求 zoom より縮めたら、縮小理由と「情報は欠落していない」ことを明示する。
-        if (fit.capped) OversizeBanner(requestedZoom = zoom, renderZoom = renderZoom, colors = colors)
+        if (fit.capped) OversizeBanner(requestedZoom = zoomState.zoom, renderZoom = renderZoom, colors = colors)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -107,66 +100,9 @@ fun StoreDiagram(
                 modifier = Modifier
                     // scroll 領域は renderZoom 後のサイズで確保する (常に cap 以内)。
                     .size(canvasW.dp, canvasH.dp)
-                    // ピンチ (トラックパッド/タッチ) で拡大縮小。zoomChange は倍率。pan/tap は横取りしない
-                    // よう zoomChange==1 の move では何もしない (単指ドラッグはスクロールに委ねる)。
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, _, zoomChange, _ ->
-                            if (zoomChange != 1f) latestOnZoomBy(zoomChange)
-                        }
-                    }
-                    // Ctrl / Cmd + ホイールでも拡大縮小 (デスクトップ標準・ピンチが届かない環境の保険)。
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.type != PointerEventType.Scroll) continue
-                                val mod = event.keyboardModifiers
-                                if (!mod.isCtrlPressed && !mod.isMetaPressed) continue
-                                val dy = event.changes.fold(0f) { acc, c -> acc + c.scrollDelta.y }
-                                if (dy != 0f) {
-                                    // 上スクロール (dy<0) で拡大。1 ノッチ ≈ 10%。
-                                    latestOnZoomBy(1f - dy * 0.1f)
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                    }
-                    .pointerInput(graph, layout, renderZoom) {
-                        detectTapGestures { offset ->
-                            // px -> renderZoom を戻して -> レイアウト単位 (dp)。auto-fit 時も実描画倍率で
-                            // 戻すので当たり判定が図とずれない。
-                            val ux = (offset.x / renderZoom).toDp().value.toDouble()
-                            val uy = (offset.y / renderZoom).toDp().value.toDouble()
-                            // sink (ラベル矩形 / 弧) は drawDiagram の pre-scale px = offset/renderZoom と同空間。
-                            val pxx = offset.x / renderZoom
-                            val pxy = offset.y / renderZoom
-                            val tolPx = EDGE_HIT_TOLERANCE.toFloat().dp.toPx()
-                            // 優先順位: node 矩形 / composite ラベル帯 (純 hitElement) > ラベル矩形 > 弧 > edge 線。
-                            // ラベル/弧は描画時に位置が決まるので sink から引く (`ide-3.md`)。
-                            val el = graph.hitElement(layout, routes, ux, uy)
-                            val hit: DiagramSelection? = when {
-                                el is DiagramSelection.Node || el is DiagramSelection.Composite -> el
-                                else -> sink.labelBoxes.firstOrNull { it.second.contains(pxx, pxy) }?.first
-                                    ?: sink.arcs.firstOrNull { distanceToPolyline(it.second, pxx, pxy) <= tolPx }?.first
-                                    ?: el
-                            }
-                            val source = graph.hitSource(layout, ux, uy)
-                            // Shift 併用でトグル複数選択、通常クリックは単一 (空クリックで全解除)。navigable だが
-                            // focus 対象でない所は選択を変えない (誤解除を防ぐ)。
-                            val shift = windowInfo.keyboardModifiers.isShiftPressed
-                            val current = latestSelection
-                            val next = when {
-                                shift && hit != null -> if (hit in current) current - hit else current + hit
-                                shift -> current
-                                hit != null -> setOf(hit)
-                                source == null -> emptySet()
-                                else -> current
-                            }
-                            if (next != current) latestOnSelectionChange(next)
-                            // ジャンプ (click-to-declaration) はフォーカスと併存させる (既存挙動を壊さない)。
-                            source?.let { latestOnNavigate(it) }
-                        }
-                    },
+                    .pinchZoom(zoomState)
+                    .ctrlWheelZoom(zoomState)
+                    .diagramTapSelection(hitContext, selectionState, onNavigate),
             ) {
                 // DrawScope 全体を renderZoom 倍 (原点固定) して描く。テキストも一緒にスケールする。
                 // sink には pre-scale px でラベル/弧が記録される (tap 側で offset/renderZoom と突き合わせる)。
@@ -176,6 +112,107 @@ fun StoreDiagram(
             }
         }
     }
+}
+
+/**
+ * Trackpad / touch pinch → zoom via [ZoomState.nudge]. `pointerInput` keys on the stable [zoomState]
+ * holder; a `zoomChange` of 1 (pure pan / tap) is ignored so single-finger drags stay with the scroll
+ * containers.
+ */
+private fun Modifier.pinchZoom(zoomState: ZoomState): Modifier =
+    pointerInput(zoomState) {
+        detectTransformGestures { _, _, zoomChange, _ ->
+            if (zoomChange != 1f) zoomState.nudge(zoomChange)
+        }
+    }
+
+/**
+ * `Ctrl` / `Cmd` + wheel → zoom (desktop standard + a fallback where pinch never arrives). One notch
+ * ≈ 10 %; scrolling up (dy < 0) zooms in. The event is consumed so it does not also scroll the canvas.
+ */
+private fun Modifier.ctrlWheelZoom(zoomState: ZoomState): Modifier =
+    pointerInput(zoomState) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type != PointerEventType.Scroll) continue
+                val mod = event.keyboardModifiers
+                if (!mod.isCtrlPressed && !mod.isMetaPressed) continue
+                val dy = event.changes.fold(0f) { acc, c -> acc + c.scrollDelta.y }
+                if (dy != 0f) {
+                    zoomState.nudge(1f - dy * 0.1f)
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        }
+    }
+
+/**
+ * Tap → focus/selection (`ide-3.md`) + click-to-declaration. Resolves the tapped target via
+ * [resolveTap], folds it into [selectionState] ([SelectionState.onTap]; Shift = toggle), and still
+ * fires [onNavigate] on a navigable hit. `pointerInput` keys on the coordinate-relevant inputs;
+ * [onNavigate] is tracked through [rememberUpdatedState] so the persistent tap lambda always calls the
+ * latest.
+ */
+@Composable
+private fun Modifier.diagramTapSelection(
+    hit: DiagramHitContext,
+    selectionState: SelectionState,
+    onNavigate: (SourceAnchor) -> Unit,
+): Modifier {
+    val latestOnNavigate by rememberUpdatedState(onNavigate)
+    // Shift 併用 (複数選択) 判定のため window の keyboard modifiers を tap 時に読む。
+    val windowInfo = LocalWindowInfo.current
+    return pointerInput(hit.graph, hit.layout, hit.renderZoom) {
+        detectTapGestures { offset ->
+            val tap = resolveTap(hit, offset)
+            selectionState.onTap(
+                hit = tap.selection,
+                shift = windowInfo.keyboardModifiers.isShiftPressed,
+                clickedEmpty = tap.source == null,
+            )
+            // ジャンプ (click-to-declaration) はフォーカスと併存させる (既存挙動を壊さない)。
+            tap.source?.let { latestOnNavigate(it) }
+        }
+    }
+}
+
+/** Everything a tap needs to resolve a pointer offset back to a focus selection / navigation target. */
+private class DiagramHitContext(
+    val graph: DiagramGraph,
+    val layout: GraphLayout,
+    val routes: Map<GraphEdge, List<Point>>,
+    val sink: DiagramInteractionSink,
+    val renderZoom: Float,
+)
+
+/** What a tap resolved to: the element to focus ([selection]) and the declaration to jump to ([source]). */
+private class TapHit(val selection: DiagramSelection?, val source: SourceAnchor?)
+
+/**
+ * Resolves a pointer [offset] (screen px) against [ctx]. Priority mirrors the draw order: a node
+ * rectangle / composite label strip (pure [hitElement]) wins, then a label pill, then a self-loop /
+ * scope-stay arc, then an edge line. Labels and arcs are positioned only while drawing, so they come
+ * from the draw-time [DiagramInteractionSink] and are matched in pre-scale px (`offset / renderZoom`),
+ * the same space [drawDiagram] records them in. [TapHit.source] is the click-to-declaration target.
+ */
+private fun PointerInputScope.resolveTap(ctx: DiagramHitContext, offset: Offset): TapHit {
+    // px -> renderZoom を戻して -> レイアウト単位 (dp)。auto-fit 時も実描画倍率で戻すので図とずれない。
+    val ux = (offset.x / ctx.renderZoom).toDp().value.toDouble()
+    val uy = (offset.y / ctx.renderZoom).toDp().value.toDouble()
+    // sink (ラベル矩形 / 弧) は drawDiagram の pre-scale px = offset/renderZoom と同空間。
+    val pxx = offset.x / ctx.renderZoom
+    val pxy = offset.y / ctx.renderZoom
+    val tolPx = EDGE_HIT_TOLERANCE.toFloat().dp.toPx()
+    // 優先順位: node 矩形 / composite ラベル帯 (純 hitElement) > ラベル矩形 > 弧 > edge 線。
+    val el = ctx.graph.hitElement(ctx.layout, ctx.routes, ux, uy)
+    val selection: DiagramSelection? = when {
+        el is DiagramSelection.Node || el is DiagramSelection.Composite -> el
+        else -> ctx.sink.labelBoxes.firstOrNull { it.second.contains(pxx, pxy) }?.first
+            ?: ctx.sink.arcs.firstOrNull { distanceToPolyline(it.second, pxx, pxy) <= tolPx }?.first
+            ?: el
+    }
+    return TapHit(selection, ctx.graph.hitSource(ctx.layout, ux, uy))
 }
 
 /**

@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import me.tbsten.koma.strict.idea.ui.DiagramColors
+import me.tbsten.koma.strict.idea.ui.ZoomState
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
 import org.jetbrains.jewel.ui.component.Text
@@ -21,9 +22,8 @@ import kotlin.math.roundToInt
 /**
  * Floating zoom controls pinned to the bottom-right corner of the Diagram tab (map / draw.io style).
  * Zoom out / in are Jewel [IconButton]s carrying the platform ExpUI `remove` / `add` glyphs (matching
- * the IDE chrome) instead of text `−` / `+`; the `%` readout between them resets to 100% on click.
- * Moved out of the [Header] so the diagram gets a full-width chrome row and the zoom sits where the eye
- * expects it on a canvas.
+ * the IDE chrome); the `%` readout between them resets to 100% on click. All zoom logic lives in
+ * [ZoomState], so this only reads [ZoomState.zoom] and calls its operations — no value + callback pairs.
  *
  * The row draws on a subtle raised card ([DiagramColors.nodeFill] + border) so it stays readable over
  * whatever diagram content is behind it. The caller positions it (typically
@@ -35,10 +35,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 internal fun DiagramZoomControls(
-    zoom: Float,
-    onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit,
-    onZoomReset: () -> Unit,
+    zoomState: ZoomState,
     colors: DiagramColors,
     modifier: Modifier = Modifier,
 ) {
@@ -50,15 +47,15 @@ internal fun DiagramZoomControls(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        IconButton(onClick = onZoomOut) {
+        IconButton(onClick = zoomState::zoomOut) {
             Icon(key = AllIconsKeys.General.Remove, contentDescription = "Zoom out")
         }
         Text(
-            "${(zoom * 100).roundToInt()}%",
+            "${(zoomState.zoom * 100).roundToInt()}%",
             color = colors.compositeLabel,
-            modifier = Modifier.clickable(onClick = onZoomReset).padding(horizontal = 4.dp),
+            modifier = Modifier.clickable(onClick = zoomState::reset).padding(horizontal = 4.dp),
         )
-        IconButton(onClick = onZoomIn) {
+        IconButton(onClick = zoomState::zoomIn) {
             Icon(key = AllIconsKeys.General.Add, contentDescription = "Zoom in")
         }
     }

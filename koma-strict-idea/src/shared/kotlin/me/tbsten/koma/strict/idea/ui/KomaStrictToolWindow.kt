@@ -8,10 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -21,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.layout.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.LayoutConfig
-import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import me.tbsten.koma.strict.idea.ui.component.DegradedBanner
@@ -47,11 +43,11 @@ private val UiLayoutConfig = LayoutConfig(layerGap = 208.0, siblingGap = 60.0)
  * `renderComposeScene` preview. A Jewel theme must already be installed by the caller
  * (`addComposeTab` / `IntUiTheme`).
  *
- * When [stores] is empty the window shows setup guidance; with one or more it renders a [Header]
- * (store selector + LR/TB toggle + Copy image + Reload), the diagram itself with floating zoom
- * controls at its bottom-right ([DiagramZoomControls]), and — for a degraded model — a
- * [DegradedBanner] while still showing whatever names resolved. The composables for each surface
- * live in their own files (`Header`, `Guidance`).
+ * All interactive state lives in [KomaStrictToolWindowContentState]; this composable only wires that
+ * state to the UI. When [stores] is empty it shows setup guidance; otherwise it renders a [Header]
+ * (store selector + LR/TB toggle + Copy image + Reload), the diagram with floating zoom controls at
+ * its bottom-right ([DiagramZoomControls]), and — for a degraded model — a [DegradedBanner] while
+ * still showing whatever names resolved.
  */
 @Composable
 fun KomaStrictToolWindowContent(
@@ -75,26 +71,18 @@ fun KomaStrictToolWindowContent(
             return@Column
         }
 
-        // 選択は store の識別名リストで安定化する。再解析ごとに stores 参照は変わるが、
-        // 中身 (store の集合) が同じなら選択を保持し、編集中に表示 store が先頭へ戻らないようにする。
-        var selected by remember(stores.map { it.root.simpleName }) { mutableStateOf(0) }
-        var direction by remember { mutableStateOf(LayoutDirection.TB) }
-        var zoom by remember { mutableStateOf(1f) }
-
-        val model = stores[selected.coerceIn(0, stores.lastIndex)]
-        // フォーカス選択は tool window 側で保持する (StoreDiagram は制御された view)。こうすることで
-        // "Copy image" が現在の focus 状態を焼き込んでコピーできる (`ide-3.md`)。図が変わればリセット。
-        var selection by remember(model, direction) { mutableStateOf(emptySet<DiagramSelection>()) }
+        val state = rememberKomaStrictToolWindowContentState(stores)
+        val model = state.model
         // 図の構築 (lowering + layout) を保護する。半端/異常なモデルで例外が飛んでも composition を
-        // 巻き添えにして固まらせない。失敗時は Diagram タブにだけエラーを出し、ヘッダ (Reload / 表切替)
-        // は生かして復帰の導線を残す。ただし runCatching (= Throwable 全捕捉) は使わない: 協調キャンセル
+        // 巻き添えにして固まらせない。失敗時は Diagram にだけエラーを出し、ヘッダ (Reload / 向き切替) は
+        // 生かして復帰の導線を残す。ただし runCatching (= Throwable 全捕捉) は使わない: 協調キャンセル
         // (CancellationException) は握りつぶさず再送出し、VirtualMachineError (OOM/StackOverflow) 等の
         // Error は捕えず伝播させる (壊れた JVM 状態で UI を続行しない)。回復可能な Exception だけ Render
         // エラーへ縮退する。
-        val prepared = remember(model, direction) {
+        val prepared = remember(model, state.direction.direction) {
             try {
                 val g = GraphLowering.lower(model)
-                Result.success(g to LayeredLayout.layout(g, direction, UiLayoutConfig))
+                Result.success(g to LayeredLayout.layout(g, state.direction.direction, UiLayoutConfig))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -109,7 +97,7 @@ fun KomaStrictToolWindowContent(
         val copyTextMeasurer = rememberTextMeasurer()
         val onCopyImage: (() -> Boolean)? = prepared.getOrNull()?.let { (graph, graphLayout) ->
             // 選択があれば focus を焼き込む (フォーカス状態のままコピー)。無ければ従来通り全体を通常描画。
-            val copyFocus = selection.takeIf { it.isNotEmpty() }?.let { sel -> graph.focusFrom(sel) }
+            val copyFocus = state.focus.selection.takeIf { it.isNotEmpty() }?.let { sel -> graph.focusFrom(sel) }
             val action: () -> Boolean = {
                 copyDiagramImageToClipboard(
                     graph = graph,
@@ -126,12 +114,10 @@ fun KomaStrictToolWindowContent(
 
         Header(
             stores = stores,
-            selected = selected,
-            onSelect = { selected = it },
-            direction = direction,
-            onToggleDirection = {
-                direction = if (direction == LayoutDirection.LR) LayoutDirection.TB else LayoutDirection.LR
-            },
+            selected = state.store.selectedIndex,
+            onSelect = state::selectStore,
+            direction = state.direction.direction,
+            onToggleDirection = state.direction::toggle,
             onReload = onReload,
             colors = colors,
             onCopyImage = onCopyImage,
@@ -149,11 +135,8 @@ fun KomaStrictToolWindowContent(
                         layout = layout,
                         colors = colors,
                         onNavigate = onNavigate,
-                        zoom = zoom,
-                        // ピンチ / Ctrl+ホイールの倍率を zoom に畳み込む (ボタンと同じ 0.5〜2.5 に制限)。
-                        onZoomBy = { factor -> zoom = (zoom * factor).coerceIn(0.5f, 2.5f) },
-                        selection = selection,
-                        onSelectionChange = { selection = it },
+                        zoomState = state.zoom,
+                        selectionState = state.focus,
                     )
                 },
                 onFailure = { RenderErrorGuidance(it, colors) },
@@ -161,10 +144,7 @@ fun KomaStrictToolWindowContent(
             // 図の拡大縮小は図が描けている時だけ、canvas の右下に浮かせる (map / draw.io 風)。
             if (prepared.isSuccess) {
                 DiagramZoomControls(
-                    zoom = zoom,
-                    onZoomIn = { zoom = (zoom + 0.15f).coerceAtMost(2.5f) },
-                    onZoomOut = { zoom = (zoom - 0.15f).coerceAtLeast(0.5f) },
-                    onZoomReset = { zoom = 1f },
+                    zoomState = state.zoom,
                     colors = colors,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
                 )
@@ -173,7 +153,7 @@ fun KomaStrictToolWindowContent(
     }
 }
 
-/** A 1dp horizontal rule between the header, tabs and content. */
+/** A 1dp horizontal rule between the header and the content. */
 @Composable
 private fun Divider(colors: DiagramColors) {
     Box(Modifier.fillMaxWidth().height(1.dp).background(colors.compositeBorder))
