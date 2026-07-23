@@ -13,8 +13,8 @@ class FeedPage(val items: List<String>, val hasMore: Boolean)
  *
  * @param fetchPage Injected pager so tests can drive success / failure and page contents.
  */
-fun createFeedStore(fetchPage: suspend (offset: Int) -> FeedPage, initialState: FeedState = FeedState.Loading()): Store<FeedState, FeedAction, FeedEvent> =
-    feedStore(
+fun createFeedStore(fetchPage: suspend (offset: Int) -> FeedPage, initialState: FeedState.Loading = FeedState.Loading()): Store<FeedState, FeedAction, FeedEvent> =
+    createFeedStore(
         initialState = initialState,
         loading = FeedState.Loading.actions(
             enter = {
