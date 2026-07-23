@@ -46,6 +46,10 @@ import java.util.concurrent.atomic.AtomicLong
  * automatically when analysis finishes. A `(fileUrl, psiModStamp)` cache skips re-analysis when the
  * selection flips back to an already-analyzed, unchanged file.
  *
+ * A file with no `@StoreSpec` of its own that looks like a companion file (`<Base>.flows.kt` etc,
+ * `flows-design.md`) falls back to its sibling `<Base>.kt` ([resolveStoreSpecRoots]), so opening
+ * `FeedState.flows.kt` shows the same diagram as `FeedState.kt` instead of the empty setup screen.
+ *
  * All wiring (message-bus connection + queue + pending read actions) is scoped to the supplied
  * [Disposable] (the tool window's), so it is released when the tool window closes.
  */
@@ -174,16 +178,57 @@ internal class KomaStrictToolWindowController(
     private fun compute(file: VirtualFile): Outcome {
         val ktFile = PsiManager.getInstance(project).findFile(file) as? KtFile
             ?: return Loaded(key = null, stores = emptyList(), degraded = false)
+        // cache key はあくまで「今選択されているファイル」の識別子 + modStamp (安価な VFS/PSI チェックのみ、
+        // AA 解析なし)。companion ファイルへのフォールバック解決は下の try 内 (解析が要る) でのみ行う。
         val key = Key(file.url, ktFile.modificationStamp)
         if (key == lastKey) return Unchanged
         // 解析開始後に dumb mode へ入ると build() が IndexNotReadyException を投げる。
         // degraded 化せず DumbMode として扱い、indexing 画面 + 完了後の再解析に回す。
         return try {
-            val models = StoreSpecModelBuilder.findStoreSpecClasses(ktFile)
-                .map { StoreSpecModelBuilder.build(it) }
+            val models = resolveStoreSpecRoots(file, ktFile).map { StoreSpecModelBuilder.build(it) }
             Loaded(key, models, degraded = models.any { it.degraded })
         } catch (e: IndexNotReadyException) {
             DumbMode
+        }
+    }
+
+    /**
+     * The `@StoreSpec` roots to show for [file]: its own when it declares any, otherwise the roots of
+     * the sibling `<Base>.kt` when [file] looks like a companion file — `<Base>.flows.kt` etc
+     * (`flows-design.md`) — so opening e.g. `FeedState.flows.kt` shows the same diagram as `FeedState.kt`
+     * instead of the empty setup screen (the companion file itself carries no `@StoreSpec`).
+     */
+    internal fun resolveStoreSpecRoots(file: VirtualFile, ktFile: KtFile): List<KtClassOrObject> {
+        val ownRoots = StoreSpecModelBuilder.findStoreSpecClasses(ktFile)
+        if (ownRoots.isNotEmpty()) return ownRoots
+        val sibling = siblingStateFile(file) ?: return ownRoots
+        val siblingKtFile = PsiManager.getInstance(project).findFile(sibling) as? KtFile ?: return ownRoots
+        return StoreSpecModelBuilder.findStoreSpecClasses(siblingKtFile)
+    }
+
+    /**
+     * The `<Base>.kt` sibling of a companion file named `<Base>.<suffix>.kt` — e.g. `FeedState.flows.kt`
+     * -> `FeedState.kt` — in the same directory, or null when [file] has no extra dot segment (it already
+     * looks like a base file) or no such sibling exists.
+     */
+    private fun siblingStateFile(file: VirtualFile): VirtualFile? {
+        val baseFileName = baseStateFileName(file.name) ?: return null
+        return file.parent?.findChild(baseFileName)
+    }
+
+    internal companion object {
+        const val REFRESH_ID = "koma-strict-refresh"
+
+        /**
+         * The base state-file name for a companion file name (`FeedState.flows.kt` -> `FeedState.kt`), or
+         * null when [fileName] is not a `.kt` file or already looks like a base file (no extra dot
+         * segment before `.kt`, e.g. plain `FeedState.kt`). Pure path logic, split out from
+         * [siblingStateFile] so it is unit-testable without a live VFS.
+         */
+        internal fun baseStateFileName(fileName: String): String? {
+            if (!fileName.endsWith(".kt")) return null
+            val base = fileName.substringBefore('.') + ".kt"
+            return base.takeIf { it != fileName }
         }
     }
 
@@ -270,9 +315,5 @@ internal class KomaStrictToolWindowController(
         WriteIntentReadAction.run {
             FileEditorManager.getInstance(project).openFile(file, true)
         }
-    }
-
-    private companion object {
-        const val REFRESH_ID = "koma-strict-refresh"
     }
 }
