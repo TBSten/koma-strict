@@ -1,10 +1,13 @@
 package me.tbsten.koma.strict.idea.ui.component
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
@@ -20,8 +25,12 @@ import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import me.tbsten.koma.strict.idea.ui.diagram.DiagramColors
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
 import org.jetbrains.jewel.ui.component.Dropdown
+import org.jetbrains.jewel.ui.component.Icon
+import org.jetbrains.jewel.ui.component.IconButton
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.Tooltip
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import kotlinx.coroutines.delay
 
 /**
@@ -34,7 +43,7 @@ import kotlinx.coroutines.delay
  * [onCopyImage] copies the current figure to the system clipboard and reports success; on success the
  * button briefly reads "Copied" as feedback before reverting.
  */
-@OptIn(ExperimentalJewelApi::class)
+@OptIn(ExperimentalJewelApi::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun Header(
     stores: List<StoreDiagramModel>,
@@ -45,6 +54,8 @@ internal fun Header(
     onReload: () -> Unit,
     colors: DiagramColors,
     onCopyImage: (() -> Boolean)? = null,
+    recording: Boolean = false,
+    onToggleRecording: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -73,25 +84,34 @@ internal fun Header(
             Text(stores.first().root.simpleName, fontWeight = FontWeight.SemiBold, color = colors.nodeText)
         }
         Spacer(Modifier.weight(1f))
+        // Flow Recorder のトグル (ide-test-code.md)。record ドットのアイコンボタン (記録中は赤塗り)。
+        Tooltip(tooltip = { Text(if (recording) "Recording — click to stop" else "Record a flow") }) {
+            IconButton(onClick = onToggleRecording) { RecordGlyph(recording) }
+        }
         // トグルなので「何のコントロールか (Layout)」と「押すと切り替わる (⇄)」を明示し、現在値だけの曖昧さを消す。
         Text("Layout", color = colors.compositeLabel)
         OutlinedButton(onClick = onToggleDirection) {
             Text((if (direction == LayoutDirection.LR) "LR" else "TB") + "  ⇄")
         }
-        // 図の画像コピー。図が描けている時 (onCopyImage != null) だけ出す。成功時は短く "Copied" 表示。
+        // 図の画像コピー。図が描けている時 (onCopyImage != null) だけ出す。成功時は短くチェックに変わる。
         if (onCopyImage != null) {
             var copied by remember { mutableStateOf(false) }
             // 連打しても表示期間がリセットされるよう、成功のたびに tick を進めて LaunchedEffect を再起動する。
             var copiedTick by remember { mutableStateOf(0) }
-            OutlinedButton(
-                onClick = {
-                    if (onCopyImage()) {
-                        copied = true
-                        copiedTick++
-                    }
-                },
-            ) {
-                Text(if (copied) "Copied" else "Copy image")
+            Tooltip(tooltip = { Text(if (copied) "Copied" else "Copy image") }) {
+                IconButton(
+                    onClick = {
+                        if (onCopyImage()) {
+                            copied = true
+                            copiedTick++
+                        }
+                    },
+                ) {
+                    Icon(
+                        key = if (copied) AllIconsKeys.Actions.Checked else AllIconsKeys.Actions.Copy,
+                        contentDescription = "Copy image",
+                    )
+                }
             }
             if (copied) {
                 LaunchedEffect(copiedTick) {
@@ -100,7 +120,27 @@ internal fun Header(
                 }
             }
         }
-        // 手動再解析 (ライブ追従が拾い切れない時の保険)。
-        OutlinedButton(onClick = onReload) { Text("Reload") }
+        // 手動再解析 (ライブ追従が拾い切れない時の保険)。IDE バンドルの refresh アイコン。
+        Tooltip(tooltip = { Text("Reload") }) {
+            IconButton(onClick = onReload) { Icon(key = AllIconsKeys.Actions.Refresh, contentDescription = "Reload") }
+        }
+    }
+}
+
+private val RecordRed = Color(0xFFE5484D)
+
+/**
+ * Record dot: a filled red circle while recording, a red ring otherwise. Drawn (there is no fitting
+ * IDE-bundled "record" icon; the red dot is the universal record affordance).
+ */
+@Composable
+private fun RecordGlyph(recording: Boolean) {
+    Canvas(Modifier.size(14.dp)) {
+        val radius = size.minDimension / 2f * 0.85f
+        if (recording) {
+            drawCircle(RecordRed, radius = radius, center = center)
+        } else {
+            drawCircle(RecordRed, radius = radius, center = center, style = Stroke(width = 1.5.dp.toPx()))
+        }
     }
 }

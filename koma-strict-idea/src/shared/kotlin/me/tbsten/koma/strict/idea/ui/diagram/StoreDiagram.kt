@@ -66,6 +66,8 @@ fun StoreDiagram(
     onNavigate: (SourceAnchor) -> Unit = {},
     zoomState: ZoomState = rememberZoomState(),
     selectionState: SelectionState = rememberSelectionState(),
+    recording: Boolean = false,
+    onRecordTap: (DiagramSelection) -> Unit = {},
 ) {
     val tm = rememberTextMeasurer()
     // エッジ当たり判定用のルート (dp)。描画側 drawDiagram も同じ routeAll を使うので判定と描画が一致する
@@ -102,7 +104,7 @@ fun StoreDiagram(
                     .size(canvasW.dp, canvasH.dp)
                     .pinchZoom(zoomState)
                     .ctrlWheelZoom(zoomState)
-                    .diagramTapSelection(hitContext, selectionState, onNavigate),
+                    .diagramTapSelection(hitContext, selectionState, onNavigate, recording, onRecordTap),
             ) {
                 // DrawScope 全体を renderZoom 倍 (原点固定) して描く。テキストも一緒にスケールする。
                 // sink には pre-scale px でラベル/弧が記録される (tap 側で offset/renderZoom と突き合わせる)。
@@ -159,20 +161,33 @@ private fun Modifier.diagramTapSelection(
     hit: DiagramHitContext,
     selectionState: SelectionState,
     onNavigate: (SourceAnchor) -> Unit,
+    recording: Boolean,
+    onRecordTap: (DiagramSelection) -> Unit,
 ): Modifier {
     val latestOnNavigate by rememberUpdatedState(onNavigate)
+    // recording / onRecordTap は toggle で変わるので rememberUpdatedState 経由で最新を読む
+    // (pointerInput は座標系入力だけで re-key し、モード変更で判定器を作り直さない)。
+    val latestRecording by rememberUpdatedState(recording)
+    val latestOnRecordTap by rememberUpdatedState(onRecordTap)
     // Shift 併用 (複数選択) 判定のため window の keyboard modifiers を tap 時に読む。
     val windowInfo = LocalWindowInfo.current
     return pointerInput(hit.graph, hit.layout, hit.renderZoom) {
         detectTapGestures { offset ->
             val tap = resolveTap(hit, offset)
-            selectionState.onTap(
-                hit = tap.selection,
-                shift = windowInfo.keyboardModifiers.isShiftPressed,
-                clickedEmpty = tap.source == null,
-            )
-            // ジャンプ (click-to-declaration) はフォーカスと併存させる (既存挙動を壊さない)。
-            tap.source?.let { latestOnNavigate(it) }
+            if (latestRecording) {
+                // 記録中は選択の確定を content 側 (cursor から記録可能か判定) に委ねる。矢印/stay だけ渡し、
+                // 記録できない (cursor から出ない) クリックは選択も記録もしない = 非選択。宣言ジャンプも抑止。
+                val sel = tap.selection
+                if (sel is DiagramSelection.Edge || sel is DiagramSelection.Stay) latestOnRecordTap(sel)
+            } else {
+                selectionState.onTap(
+                    hit = tap.selection,
+                    shift = windowInfo.keyboardModifiers.isShiftPressed,
+                    clickedEmpty = tap.source == null,
+                )
+                // ジャンプ (click-to-declaration) はフォーカスと併存させる (既存挙動を壊さない)。
+                tap.source?.let { latestOnNavigate(it) }
+            }
         }
     }
 }

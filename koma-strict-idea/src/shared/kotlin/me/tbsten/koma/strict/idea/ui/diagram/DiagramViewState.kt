@@ -58,6 +58,11 @@ class SelectionState(initial: Set<DiagramSelection> = emptySet()) {
         selection = nextSelection(selection, hit, shift, clickedEmpty)
     }
 
+    /** Replace the selection outright (e.g. select the target state right after recording a transition). */
+    fun select(selection: Set<DiagramSelection>) {
+        this.selection = selection
+    }
+
     fun clear() {
         selection = emptySet()
     }

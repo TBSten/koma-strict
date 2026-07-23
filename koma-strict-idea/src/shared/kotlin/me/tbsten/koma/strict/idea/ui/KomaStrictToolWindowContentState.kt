@@ -37,7 +37,8 @@ class KomaStrictToolWindowContentState(stores: List<StoreDiagramModel>) {
 
     /**
      * Switch the shown store and drop the focus selection: its [DiagramSelection]s reference the old
-     * store's nodes, so keeping them would highlight nothing (or wrongly) in the new figure.
+     * store's nodes. The recorded flow is **not** dropped — it is controller-owned so it survives store /
+     * file switches (press Record to start a fresh one).
      */
     fun selectStore(index: Int) {
         store.select(index)
@@ -46,13 +47,23 @@ class KomaStrictToolWindowContentState(stores: List<StoreDiagramModel>) {
 }
 
 @Composable
-fun rememberKomaStrictToolWindowContentState(stores: List<StoreDiagramModel>): KomaStrictToolWindowContentState =
+fun rememberKomaStrictToolWindowContentState(stores: List<StoreDiagramModel>): KomaStrictToolWindowContentState {
     // 中身 (store 集合) が同じなら状態を保持し、編集中の再解析で表示 store が先頭へ戻らないようにする。
-    remember(stores.map { it.root.simpleName }) { KomaStrictToolWindowContentState(stores) }
+    val state = remember(stores.map { it.root.simpleName }) { KomaStrictToolWindowContentState(stores) }
+    // ただし state 名が同じでも中身が変わった再解析 (initial / nextState / emit 等の編集 + Reload) は
+    // 反映する。選択 index / direction / zoom / focus は保持したまま model だけ最新へ差し替える
+    // (構造的に等しければ no-op なので無限再コンポーズにはならない)。
+    state.store.updateStores(stores)
+    return state
+}
 
 /** Which store in the file is shown (a dropdown when there is more than one). */
 @Stable
-class StoreSelectionState(val stores: List<StoreDiagramModel>) {
+class StoreSelectionState(initialStores: List<StoreDiagramModel>) {
+    /** Latest analyzed stores. Replaced on each re-analysis so live edits reach the figure. */
+    var stores by mutableStateOf(initialStores)
+        private set
+
     var selectedIndex by mutableStateOf(0)
         private set
 
@@ -60,6 +71,11 @@ class StoreSelectionState(val stores: List<StoreDiagramModel>) {
 
     fun select(index: Int) {
         selectedIndex = index
+    }
+
+    /** Replace the stores with the latest analysis result, keeping [selectedIndex] (`ide.md` live update). */
+    fun updateStores(latest: List<StoreDiagramModel>) {
+        stores = latest
     }
 }
 
