@@ -37,6 +37,7 @@ import me.tbsten.koma.strict.idea.ui.component.RecordingPill
 import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
 import me.tbsten.koma.strict.idea.ui.diagram.StoreDiagram
 import me.tbsten.koma.strict.idea.ui.diagram.flowReveal
+import me.tbsten.koma.strict.idea.ui.diagram.recordingInnerGlow
 import me.tbsten.koma.strict.idea.ui.diagram.rememberDiagramColors
 import me.tbsten.koma.strict.idea.ui.diagram.rememberSelectionState
 import me.tbsten.koma.strict.idea.ui.diagram.rememberZoomState
@@ -256,6 +257,10 @@ private fun renderAll(outDir: File) {
     render(outDir, "flow-pill-min", 72, 72, dark = false) { FlowPillPreview(minimized = true) }
     // 狭幅: FlowRow で View Test Code などが次の行に折り返り、潰れない (横幅不足時の確認)。
     render(outDir, "flow-pill-narrow", 260, 180, dark = false) { FlowPillPreview(minimized = false) }
+    // Record 中の viewport inner glow (`flows-design.md`)。パルスは1フレーム static render には写らないので、
+    // 決定的な中間パルス強度に固定して golden 化する (ヘッダ・図・zoom controls との関係も込みで確認)。
+    render(outDir, "recording-glow", 1040, 540, dark = false) { RecordingGlowPreview() }
+    render(outDir, "recording-glow", 1040, 540, dark = true) { RecordingGlowPreview() }
     // 記録中の選択表示: cursor(Loading) から記録可能な transition だけ強調・他は減光 (選択不可の見た目)。
     render(outDir, "flow-recordable", 1200, 520, dark = false) {
         DiagramLrFocusPreview(SampleModels.feed()) { graph ->
@@ -265,6 +270,18 @@ private fun renderAll(outDir: File) {
     }
     // 注: パネル展開時の分割 (HorizontalSplitLayout) は layoutCoordinates 依存で単発 renderComposeScene
     // では描画されない (実 IDE の live ComposePanel でのみ確認できる) ため preview scene は持たない。
+}
+
+/**
+ * The recording inner-glow overlay (`flows-design.md`) over the full tool-window chrome, at a fixed
+ * mid-pulse intensity (deterministic for a golden PNG — the real pulse only shows in a live IDE).
+ */
+@Composable
+private fun RecordingGlowPreview() {
+    val colors = rememberDiagramColors()
+    Box(Modifier.fillMaxSize().recordingInnerGlow(colors.recording, intensity = 0.55f)) {
+        KomaStrictToolWindowContent(listOf(SampleModels.feed()))
+    }
 }
 
 /** The floating recording pill, expanded or minimized (`ide-test-code.png`). */

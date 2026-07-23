@@ -44,6 +44,8 @@ data class DiagramColors(
     val exitFill: Color,
     /** `@OnExit` badge pill text. */
     val exitText: Color,
+    /** The record-mode red: the Header record dot and the recording viewport glow (`flows-design.md`). */
+    val recording: Color,
 ) {
     /** Line color for an edge of the given [kind] (`ide.md`: edges are styled per trigger family). */
     fun edgeColor(kind: EdgeKind): Color = when (kind) {
@@ -92,6 +94,11 @@ fun rememberDiagramColors(): DiagramColors {
             recover = if (dark) Color(0xFFB392F0) else Color(0xFF8250DF),
             exitFill = if (dark) Color(0xFF3A3D40) else Color(0xFFECEFF1),
             exitText = if (dark) Color(0xFFB0BEC5) else Color(0xFF455A64),
+            // 単一の赤 (light/dark 共通): record dot は元々テーマ非依存の赤で両テーマに映る実績があるため揃える。
+            recording = RecordingRed,
         )
     }
 }
+
+/** The record-mode red, shared by the Header record dot and the recording viewport glow. */
+internal val RecordingRed: Color = Color(0xFFE5484D)

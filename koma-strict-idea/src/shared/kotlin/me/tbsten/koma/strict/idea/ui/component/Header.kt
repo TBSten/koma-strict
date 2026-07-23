@@ -111,7 +111,7 @@ internal fun Header(
         Spacer(Modifier.weight(1f))
         // Flow Recorder のトグル (ide-test-code.md)。record ドットのアイコンボタン (記録中は赤塗り)。
         Tooltip(tooltip = { Text(if (recording) "Recording — click to stop" else "Record a flow") }) {
-            IconButton(onClick = onToggleRecording) { RecordGlyph(recording) }
+            IconButton(onClick = onToggleRecording) { RecordGlyph(recording, colors.recording) }
         }
         // トグルなので「何のコントロールか (Layout)」と「押すと切り替わる (⇄)」を明示し、現在値だけの曖昧さを消す。
         Text("Layout", color = colors.compositeLabel)
@@ -152,20 +152,18 @@ internal fun Header(
     }
 }
 
-private val RecordRed = Color(0xFFE5484D)
-
 /**
- * Record dot: a filled red circle while recording, a red ring otherwise. Drawn (there is no fitting
+ * Record dot: a filled [color] circle while recording, a ring otherwise. Drawn (there is no fitting
  * IDE-bundled "record" icon; the red dot is the universal record affordance).
  */
 @Composable
-private fun RecordGlyph(recording: Boolean) {
+private fun RecordGlyph(recording: Boolean, color: Color) {
     Canvas(Modifier.size(14.dp)) {
         val radius = size.minDimension / 2f * 0.85f
         if (recording) {
-            drawCircle(RecordRed, radius = radius, center = center)
+            drawCircle(color, radius = radius, center = center)
         } else {
-            drawCircle(RecordRed, radius = radius, center = center, style = Stroke(width = 1.5.dp.toPx()))
+            drawCircle(color, radius = radius, center = center, style = Stroke(width = 1.5.dp.toPx()))
         }
     }
 }

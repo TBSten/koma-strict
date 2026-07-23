@@ -38,7 +38,9 @@ import me.tbsten.koma.strict.idea.ui.diagram.StoreDiagram
 import me.tbsten.koma.strict.idea.ui.diagram.copyDiagramImageToClipboard
 import me.tbsten.koma.strict.idea.ui.diagram.flowReveal
 import me.tbsten.koma.strict.idea.ui.diagram.focusFrom
+import me.tbsten.koma.strict.idea.ui.diagram.recordingInnerGlow
 import me.tbsten.koma.strict.idea.ui.diagram.rememberDiagramColors
+import me.tbsten.koma.strict.idea.ui.diagram.rememberRecordingGlowIntensity
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.HorizontalSplitLayout
 import org.jetbrains.jewel.ui.component.rememberSplitLayoutState
@@ -208,9 +210,12 @@ fun KomaStrictToolWindowContent(
                 false
             }
         }
+        // Record 中は viewport の縁を内側から赤くじわぁっと明滅させる (`flows-design.md`)。スクロール可能な
+        // 図の外側 (この Box) に敷くので、図をスクロールしても赤枠は viewport に固定されたまま動かない。
+        val recordingGlow = rememberRecordingGlowIntensity(recording.recording)
         // 図ペイン (拡大ボタン + 記録ピルを内包)。分割の左 / パネル閉時はフル幅。
         val diagramArea: @Composable () -> Unit = {
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().recordingInnerGlow(colors.recording, recordingGlow)) {
                 prepared.fold(
                     onSuccess = { (graph, layout) ->
                         StoreDiagram(
