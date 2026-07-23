@@ -15,7 +15,8 @@ plugins {
 }
 
 group = "me.tbsten.koma.strict"
-version = "0.1.0"
+// 版は root と共有する libs.versions.toml の koma-strict を SSoT にする (プラグイン版 = ライブラリ版)。
+version = libs.versions.koma.strict.get()
 
 // repositories は settings.gradle.kts の dependencyResolutionManagement に集約 (FAIL_ON_PROJECT_REPOS)。
 

@@ -31,6 +31,13 @@ dependencyResolutionManagement {
             defaultRepositories()
         }
     }
+    // ルート koma-strict と同じ版カタログ (../gradle/libs.versions.toml) を共有し、版の SSoT を1箇所に集約する。
+    // (完全独立ビルドなので include ではなく TOML を直接読み込む。)
+    versionCatalogs {
+        create("libs") {
+            from(files("../gradle/libs.versions.toml"))
+        }
+    }
 }
 
 rootProject.name = "koma-strict-idea"
