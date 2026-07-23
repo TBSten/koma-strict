@@ -33,5 +33,9 @@
         <toolWindow id="Koma Strict"
                     anchor="right"
                     factoryClass="me.tbsten.koma.strict.idea.KomaStrictToolWindowFactory"/>
+        <!-- State 定義ファイルの gutter に「次の State / 遷移先」へジャンプするアイコンを出す。 -->
+        <codeInsight.lineMarkerProvider
+                language="kotlin"
+                implementationClass="me.tbsten.koma.strict.idea.frontend.StoreSpecGutterLineMarkerProvider"/>
     </extensions>
 </idea-plugin>
