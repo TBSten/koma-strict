@@ -1,7 +1,7 @@
 [versions]
 
 # koma-strict 自身の publish バージョン (root build.gradle.kts の allprojects で一元設定する SSoT)
-koma-strict = "0.1.0"
+koma-strict = "0.2.0"
 
 kotlin = "2.4.0"
 agp = "9.0.0"
