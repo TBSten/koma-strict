@@ -145,6 +145,8 @@ fun KomaStrictToolWindowContent(
                     density = density,
                     layoutDirection = composeLayoutDirection,
                     textMeasurer = copyTextMeasurer,
+                    // ディレクトリへ貼ると <Store>.png になるよう店名 (FeedState -> FeedStore) を渡す。
+                    storeName = model.storeName,
                     focus = copyFocus,
                 )
             }

@@ -17,15 +17,21 @@ import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
+import java.awt.image.BufferedImage
+import java.io.File
+import java.nio.file.Files
+import javax.imageio.ImageIO
 import kotlin.math.ceil
 
 /**
  * Renders the current diagram offscreen (the same [drawDiagram] pass the canvas uses, over an opaque
- * [DiagramColors.background] fill) and puts the resulting image on the AWT system clipboard as
- * [DataFlavor.imageFlavor], so it can be pasted into chats / docs / issue trackers ("Copy image" in
- * the header). Returns `true` on success; a headless environment (the preview renderer) or any other
- * clipboard failure is swallowed and reported as `false` — copying is a convenience, never worth
- * crashing the tool window for.
+ * [DiagramColors.background] fill) and puts the result on the AWT system clipboard so it can be pasted
+ * into chats / docs / issue trackers ("Copy image" in the header). Two flavors are offered: the image
+ * itself ([DataFlavor.imageFlavor]) for inline paste, and — so a paste into a *directory* lands as
+ * `<storeName>.png` rather than a generic "clipboard.png" — a one-element file list
+ * ([DataFlavor.javaFileListFlavor]) backed by a temp PNG named [storeName]`.png`. Returns `true` on
+ * success; a headless environment (the preview renderer) or any other clipboard / IO failure is
+ * swallowed and reported as `false` — copying is a convenience, never worth crashing the tool window.
  */
 internal fun copyDiagramImageToClipboard(
     graph: DiagramGraph,
@@ -34,15 +40,34 @@ internal fun copyDiagramImageToClipboard(
     density: Density,
     layoutDirection: LayoutDirection,
     textMeasurer: TextMeasurer,
+    storeName: String,
     focus: FocusSet? = null,
 ): Boolean = try {
     val image = renderDiagramImage(graph, layout, colors, density, layoutDirection, textMeasurer, focus)
+    // ディレクトリへ貼ると <storeName>.png になるよう、その名前の temp PNG を file flavor で載せる。
+    val file = writeTempPng(image, storeName)
     // ヘッドレス環境 (preview) では Toolkit / clipboard アクセスが例外を投げるので try 全体で握りつぶす。
-    Toolkit.getDefaultToolkit().systemClipboard.setContents(ImageTransferable(image), null)
+    Toolkit.getDefaultToolkit().systemClipboard.setContents(DiagramImageTransferable(image, file), null)
     true
 } catch (e: Exception) {
     false
 }
+
+/** Writes [image] to a temp file literally named `<storeName>.png` (its name becomes the pasted file name), or null. */
+private fun writeTempPng(image: BufferedImage, storeName: String): File? = try {
+    // 名前が貼り付け後のファイル名になるので、衝突しない専用の temp ディレクトリ内に正確な名前で置く。
+    val dir = Files.createTempDirectory("koma-diagram").toFile().apply { deleteOnExit() }
+    File(dir, "${sanitizeFileName(storeName)}.png").apply {
+        ImageIO.write(image, "png", this)
+        deleteOnExit()
+    }
+} catch (e: Exception) {
+    null
+}
+
+/** Keeps only file-name-safe chars; falls back to `diagram` if nothing usable remains. */
+private fun sanitizeFileName(name: String): String =
+    name.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.ifBlank { "diagram" }
 
 /**
  * Draws [graph]/[layout] into a fresh [ImageBitmap] at the ambient [density] (100 % zoom) and converts
@@ -59,7 +84,7 @@ private fun renderDiagramImage(
     layoutDirection: LayoutDirection,
     textMeasurer: TextMeasurer,
     focus: FocusSet? = null,
-): Image {
+): BufferedImage {
     // 異常モデルでも巨大/非有限サイズで落ちないよう canvas と同じ流儀でクランプする (dp 単位)。
     val wDp = clampDp(layout.canvasSize.width)
     val hDp = clampDp(layout.canvasSize.height)
@@ -88,10 +113,21 @@ private fun clampDp(value: Double): Double =
 // クリップボード画像の 1 辺の上限 (px)。実用図は遥かに下だが、病的モデルでの巨大 allocate を防ぐ。
 private const val MAX_IMAGE_EXTENT_PX = 8192.0
 
-/** A minimal [Transferable] exposing one image as [DataFlavor.imageFlavor] (what AWT clipboards expect). */
-private class ImageTransferable(private val image: Image) : Transferable {
-    override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(DataFlavor.imageFlavor)
-    override fun isDataFlavorSupported(flavor: DataFlavor): Boolean = flavor == DataFlavor.imageFlavor
-    override fun getTransferData(flavor: DataFlavor): Any =
-        if (flavor == DataFlavor.imageFlavor) image else throw UnsupportedFlavorException(flavor)
+/**
+ * Exposes the diagram both as an inline image ([DataFlavor.imageFlavor]) and — when [file] is non-null —
+ * as a one-element file list ([DataFlavor.javaFileListFlavor]) so a paste into a directory keeps the
+ * file's name (`<storeName>.png`). Image flavor is listed first so image-preferring targets (chats,
+ * docs) still inline it; file managers pick up the file-list flavor regardless of order.
+ */
+private class DiagramImageTransferable(private val image: Image, private val file: File?) : Transferable {
+    private val flavors: Array<DataFlavor> =
+        if (file != null) arrayOf(DataFlavor.imageFlavor, DataFlavor.javaFileListFlavor) else arrayOf(DataFlavor.imageFlavor)
+
+    override fun getTransferDataFlavors(): Array<DataFlavor> = flavors
+    override fun isDataFlavorSupported(flavor: DataFlavor): Boolean = flavors.any { it == flavor }
+    override fun getTransferData(flavor: DataFlavor): Any = when {
+        flavor == DataFlavor.imageFlavor -> image
+        flavor == DataFlavor.javaFileListFlavor && file != null -> listOf(file)
+        else -> throw UnsupportedFlavorException(flavor)
+    }
 }

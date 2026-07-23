@@ -40,7 +40,14 @@ data class StoreDiagramModel(
     /** Whether the given leaf is reachable from [initial]. Unknown / unresolved leaves count as reachable. */
     fun isReachable(id: StateId): Boolean =
         reachableLeafIds.isEmpty() || id in reachableLeafIds
+
+    /** Conventional store class name of this diagram: `FeedState` -> `FeedStore`, `Tabs` -> `TabsStore`. */
+    val storeName: String get() = storeNameOf(root.simpleName)
 }
+
+/** Conventional store class name for a state-root simple name: `FeedState` -> `FeedStore`, `Tabs` -> `TabsStore`. */
+fun storeNameOf(rootSimpleName: String): String =
+    if (rootSimpleName.endsWith("State")) rootSimpleName.removeSuffix("State") + "Store" else rootSimpleName + "Store"
 
 /**
  * Concrete leaves that a trigger declared on [scope] applies to:
