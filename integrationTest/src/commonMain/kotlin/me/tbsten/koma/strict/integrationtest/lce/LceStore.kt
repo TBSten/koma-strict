@@ -17,7 +17,7 @@ fun createLceStore(
     fetchData: suspend () -> String,
     initialState: LceState = LceState.Loading(),
 ): Store<LceState, LceAction, LceEvent> =
-    lceStore(
+    restoreLceStore(
         initialState = initialState,
         loading = LceState.Loading.actions(
             enter = {

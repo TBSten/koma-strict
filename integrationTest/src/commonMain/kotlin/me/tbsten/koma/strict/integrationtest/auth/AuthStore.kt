@@ -19,7 +19,7 @@ internal fun createAuthStore(
     restoreSession: suspend () -> Session?,
     authenticate: suspend (userName: String) -> Unit,
 ): Store<AuthState, AuthAction, AuthEvent> =
-    authStore(
+    createAuthStore(
         initialState = AuthState.CheckingSession(),
         default = AuthState.actions(
             // param 名は recover{Exception}(仮確定)。scope には error: SessionExpiredException

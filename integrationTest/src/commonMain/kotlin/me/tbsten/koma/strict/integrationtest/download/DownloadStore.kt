@@ -3,7 +3,7 @@ package me.tbsten.koma.strict.integrationtest.download
 import koma.core.Store
 
 // 自宣言 + 子を持つ中間 sealed の plus 合成 (`actions(...) + states(...)`) と
-// per-store factory (`downloadStore`) の実利用 (実物 koma rc02 での behavior 検証対象)。
+// per-store factory (`createDownloadStore`) の実利用 (実物 koma rc02 での behavior 検証対象)。
 
 /**
  * Builds the download sample store through the generated per-store factory
@@ -17,7 +17,7 @@ import koma.core.Store
  *   (`Idle` declares no `@OnEnter`, so the raw handler observably fires).
  */
 fun createDownloadStore(): Store<DownloadState, DownloadAction, DownloadEvent> =
-    downloadStore(
+    createDownloadStore(
         initialState = DownloadState.Idle,
         idle = DownloadState.Idle.actions(
             start = { nextState.toActiveRunning(url = action.url) }, // 入力の取り込みは明示(原則 2)

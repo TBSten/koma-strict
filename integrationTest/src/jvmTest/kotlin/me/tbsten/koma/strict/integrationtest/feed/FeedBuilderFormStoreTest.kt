@@ -17,7 +17,7 @@ import kotlin.test.assertFailsWith
 class FeedBuilderFormStoreTest {
     /** states builder で束ねた feed store (値渡しと builder ネストの混在)。挙動は createFeedStore と同一になる想定。 */
     private fun createBuilderFormFeedStore(fetchPage: suspend (offset: Int) -> FeedPage): Store<FeedState, FeedAction, FeedEvent> =
-        feedStore(
+        createFeedStore(
             initialState = FeedState.Loading(),
             loading = FeedState.Loading.actions(
                 enter = {
