@@ -123,7 +123,7 @@ package はすべて `me.tbsten.koma.strict` 直下。
 
 ## IDE Plugin
 
-<video src="https://github.com/user-attachments/assets/17f6b4d8-4309-46c7-a7d9-a6fa686acf62" width="80%" controls></video>
+<video src="https://github.com/user-attachments/assets/6f857454-1bd9-4c58-b348-a76b2b97df19" width="80%" controls></video>
 
 ## 網羅性はどう強制されるか(4+1 層)
 
