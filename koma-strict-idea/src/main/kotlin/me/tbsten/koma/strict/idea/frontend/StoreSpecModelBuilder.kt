@@ -78,10 +78,11 @@ object StoreSpecModelBuilder {
     fun build(root: KtClassOrObject): StoreDiagramModel {
         // 半端コード用の degraded fallback は resolution 無しの PSI 近似 (analyze が丸ごと失敗した時のみ使う)。
         val psiSkeleton = buildSkeleton(root, StateId.Root, isRoot = true, ::psiChildState)
+        val packageName = root.containingKtFile.packageFqName.asString()
         // KSP 契約: root が sealed でなければ state tree を成さない (KSP は null を返し何も生成しない)。
         // KSP invalid な非 sealed root を「正常な完全 model」として見せず degraded にする。
         if (!root.hasModifier(KtTokens.SEALED_KEYWORD)) {
-            return degradedModel(psiSkeleton, "@StoreSpec must be applied to a sealed interface or sealed class.")
+            return degradedModel(psiSkeleton, "@StoreSpec must be applied to a sealed interface or sealed class.", packageName)
         }
         return try {
             analyze(root) {
@@ -101,6 +102,7 @@ object StoreSpecModelBuilder {
                     initial = initial.targets,
                     reachableLeafIds = reachable,
                     unresolved = unresolved,
+                    packageName = packageName,
                 )
             }
         } catch (e: Exception) {
@@ -112,7 +114,7 @@ object StoreSpecModelBuilder {
             ) {
                 throw e
             }
-            degradedModel(psiSkeleton, e.message ?: e::class.simpleName)
+            degradedModel(psiSkeleton, e.message ?: e::class.simpleName, packageName)
         }
     }
 
@@ -235,11 +237,12 @@ object StoreSpecModelBuilder {
 
     // ---- degraded fallback (names + anchors only) ----
 
-    private fun degradedModel(skeleton: NodeSkeleton, cause: String?): StoreDiagramModel =
+    private fun degradedModel(skeleton: NodeSkeleton, cause: String?, packageName: String): StoreDiagramModel =
         StoreDiagramModel(
             root = degradedNode(skeleton) as RootState,
             degraded = true,
             error = cause,
+            packageName = packageName,
         )
 
     private fun degradedNode(node: NodeSkeleton): DiagramStateNode = when (node.kind) {

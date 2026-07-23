@@ -69,6 +69,13 @@ data class ActionTrigger(
     override val emits: List<String> = emptyList(),
     override val unresolvedTargets: List<String> = emptyList(),
     override val source: SourceAnchor? = null,
+    /**
+     * Package-relative reference of the action type for code generation, e.g. `FeedAction.Retry`
+     * (the `@OnAction` type argument's `relativeClassName`). Distinct from [actionName] (the leaf
+     * simple name used in diagram labels): a `FlowStep(FeedAction.Retry::class)` needs the enclosing
+     * path. Null in pure tests / when unresolved.
+     */
+    val actionRef: String? = null,
 ) : DiagramTrigger
 
 /**
@@ -83,6 +90,8 @@ data class RecoverTrigger(
     override val emits: List<String> = emptyList(),
     override val unresolvedTargets: List<String> = emptyList(),
     override val source: SourceAnchor? = null,
+    /** Package-relative reference of the exception type for code generation, e.g. `AuthError.Expired`. Null in pure tests. */
+    val exceptionRef: String? = null,
 ) : DiagramTrigger
 
 /**

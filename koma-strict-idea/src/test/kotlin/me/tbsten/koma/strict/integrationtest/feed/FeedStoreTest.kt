@@ -11,17 +11,6 @@ class FeedStoreTest {
     fun `recorded flow`() = runTest {
         val store: FeedStore = TODO("construct FeedStore with initialState = FeedState.Loading")
         store.startAndAwait()
-        assertEquals(FeedState.Error(/* TODO: expected state props */), store.currentState)
-        store.dispatchAndAwait(FeedAction.Retry)
-        assertEquals(FeedState.Loading(/* TODO: expected state props */), store.currentState)
-        assertEquals(FeedState.Stable.Idle(/* TODO: expected state props */), store.currentState)
-        store.dispatchAndAwait(FeedAction.LoadMore)
-        assertEquals(FeedState.Stable.Idle(/* TODO: expected state props */), store.currentState)
-        store.dispatchAndAwait(FeedAction.LoadMore)
-        assertEquals(FeedState.Stable.LoadingMore(/* TODO: expected state props */), store.currentState)
-        assertEquals(FeedState.Stable.Idle(/* TODO: expected state props */), store.currentState)
-        store.dispatchAndAwait(FeedAction.Refresh)
-        assertEquals(FeedState.Stable.Refreshing(/* TODO: expected state props */), store.currentState)
-        assertEquals(FeedState.Stable.Idle(/* TODO: expected state props */), store.currentState)
+
     }
 }

@@ -91,6 +91,7 @@ private fun KaSession.readActions(
         emits = readEmits(ann),
         unresolvedTargets = ns.unresolvedTargets,
         source = ann.entryAnchor(),
+        actionRef = typeArgumentRef(ann),
     )
 }
 
@@ -107,6 +108,7 @@ private fun KaSession.readRecovers(
         emits = readEmits(ann),
         unresolvedTargets = ns.unresolvedTargets,
         source = ann.entryAnchor(),
+        exceptionRef = typeArgumentRef(ann),
     )
 }
 
@@ -189,11 +191,22 @@ private fun KaSession.classArrayElements(ann: KaAnnotation, argName: String): Li
  * Resolves the simple name of the single type argument of this annotation (`@OnAction<A>` -> `A`) from
  * the annotation's own PSI, so the type name always belongs to this exact annotation application.
  */
-private fun KaSession.typeArgumentSimpleName(ann: KaAnnotation): String? {
+private fun KaSession.typeArgumentSimpleName(ann: KaAnnotation): String? =
+    typeArgumentClassType(ann)?.classId?.shortClassName?.asString()
+
+/**
+ * Package-relative reference of the single type argument (`@OnAction<FeedAction.Retry>` -> `FeedAction.Retry`)
+ * from the annotation's own PSI, so flow codegen can emit `FlowStep(FeedAction.Retry::class)` with the
+ * enclosing path rather than the bare leaf name.
+ */
+private fun KaSession.typeArgumentRef(ann: KaAnnotation): String? =
+    typeArgumentClassType(ann)?.classId?.relativeClassName?.asString()
+
+private fun KaSession.typeArgumentClassType(ann: KaAnnotation): KaClassType? {
     val entry = ann.psi as? KtAnnotationEntry ?: return null
     val typeRef = (entry.typeReference?.typeElement as? KtUserType)
         ?.typeArgumentList?.arguments?.firstOrNull()?.typeReference ?: return null
-    return (typeRef.type as? KaClassType)?.classId?.shortClassName?.asString()
+    return typeRef.type as? KaClassType
 }
 
 private fun KaAnnotation.fqName(): String? = classId?.asFqNameString()

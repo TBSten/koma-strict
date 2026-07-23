@@ -124,6 +124,7 @@ object GraphLowering {
                                 trigger = triggerToken(trigger),
                                 emits = trigger.emits,
                                 source = trigger.source,
+                                triggerTypeRef = triggerTypeRef(trigger),
                             )
                         }
                     }
@@ -168,14 +169,15 @@ object GraphLowering {
     ): List<GraphEdge> {
         val token = triggerToken(trigger)
         val kind = kindOf(trigger)
+        val typeRef = triggerTypeRef(trigger)
         val result = mutableListOf<GraphEdge>()
         for (target in trigger.targets) {
             // toId は leaf の NodeId.State、または group の NodeId.Composite (= composite box id)。
             val toId = targetNode(target) ?: continue
-            result += GraphEdge(fromId, toId, kind, token, trigger.emits, stay = false, source = trigger.source)
+            result += GraphEdge(fromId, toId, kind, token, trigger.emits, stay = false, source = trigger.source, triggerTypeRef = typeRef)
         }
         if (includeStay && trigger.stay) {
-            result += GraphEdge(fromId, fromId, kind, token, trigger.emits, stay = true, source = trigger.source)
+            result += GraphEdge(fromId, fromId, kind, token, trigger.emits, stay = true, source = trigger.source, triggerTypeRef = typeRef)
         }
         return result
     }
@@ -206,6 +208,13 @@ object GraphLowering {
         is EnterTrigger -> "onEnter"
         is ActionTrigger -> trigger.actionName.replaceFirstChar { it.lowercase() }
         is RecoverTrigger -> "on ${trigger.exceptionName}"
+    }
+
+    /** The action / exception type reference for flow codegen (`FeedAction.Retry`); null for ENTER. */
+    private fun triggerTypeRef(trigger: DiagramTrigger): String? = when (trigger) {
+        is ActionTrigger -> trigger.actionRef
+        is RecoverTrigger -> trigger.exceptionRef
+        is EnterTrigger -> null
     }
 
     private fun anyLabel(node: DiagramStateNode): String =

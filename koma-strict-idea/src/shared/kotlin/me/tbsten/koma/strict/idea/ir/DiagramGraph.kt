@@ -121,6 +121,12 @@ data class GraphEdge(
      * (which comes from `@StoreSpec(initial)`, not a trigger) and in pure tests.
      */
     val source: SourceAnchor? = null,
+    /**
+     * Package-relative reference of the trigger's action / exception type for flow code generation,
+     * e.g. `FeedAction.Retry` (`ide-test-code.md`). Null for ENTER / INITIAL edges (no type) and in
+     * pure tests.
+     */
+    val triggerTypeRef: String? = null,
 ) {
     /** Rendered edge label, e.g. `onEnter / LoadFailed`, `loadMore (stay)`. Empty for INITIAL. */
     val label: String
@@ -146,6 +152,8 @@ data class ScopeStay(
     val emits: List<String> = emptyList(),
     /** Declaration of the scope-shared trigger's annotation site, for click-to-declaration (`ide-4.md`). */
     val source: SourceAnchor? = null,
+    /** Package-relative reference of the shared trigger's action / exception type for flow codegen. Null for ENTER. */
+    val triggerTypeRef: String? = null,
 ) {
     /** Rendered label, same format as [GraphEdge.label] with the implicit `(stay)` marker. */
     val label: String

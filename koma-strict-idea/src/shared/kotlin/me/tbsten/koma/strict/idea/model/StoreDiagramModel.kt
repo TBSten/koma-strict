@@ -28,6 +28,8 @@ data class StoreDiagramModel(
     val unresolved: Boolean = false,
     /** Human-readable reason for a degraded / error model, if any. */
     val error: String? = null,
+    /** Package of the `@StoreSpec` root's file, e.g. `com.example.feed` (for generated test files); empty in pure tests. */
+    val packageName: String = "",
 ) {
     /** All concrete leaves of the store (source order). */
     val leaves: List<LeafState> get() = root.leaves()
