@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
+import me.tbsten.koma.strict.idea.model.DiagramFlow
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import me.tbsten.koma.strict.idea.ui.diagram.DiagramColors
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
@@ -56,6 +57,12 @@ internal fun Header(
     onCopyImage: (() -> Boolean)? = null,
     recording: Boolean = false,
     onToggleRecording: () -> Unit = {},
+    /** `@FlowSpec` flows declared on the store (`flows-design.md`); a picker appears only when non-empty. */
+    flows: List<DiagramFlow> = emptyList(),
+    /** Currently playing flow (null = none). */
+    selectedFlow: DiagramFlow? = null,
+    /** Pick a flow to play (null clears playback). */
+    onSelectFlow: (DiagramFlow?) -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -82,6 +89,24 @@ internal fun Header(
             }
         } else {
             Text(stores.first().root.simpleName, fontWeight = FontWeight.SemiBold, color = colors.nodeText)
+        }
+        // Flow ピッカー (flows-design.md): @FlowSpec がある store でだけ出す。選ぶと図をステップ再生し、
+        // (none) で解除。記録中は録画パネルに譲るので隠す。
+        if (flows.isNotEmpty() && !recording) {
+            Dropdown(
+                menuContent = {
+                    selectableItem(selected = selectedFlow == null, onClick = { onSelectFlow(null) }) {
+                        Text("(none)")
+                    }
+                    flows.forEach { flow ->
+                        selectableItem(selected = flow == selectedFlow, onClick = { onSelectFlow(flow) }) {
+                            Text(flow.name)
+                        }
+                    }
+                },
+            ) {
+                Text(selectedFlow?.name ?: "▶ Flow")
+            }
         }
         Spacer(Modifier.weight(1f))
         // Flow Recorder のトグル (ide-test-code.md)。record ドットのアイコンボタン (記録中は赤塗り)。

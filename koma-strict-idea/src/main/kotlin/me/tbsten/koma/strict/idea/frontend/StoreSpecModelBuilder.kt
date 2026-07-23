@@ -103,6 +103,7 @@ object StoreSpecModelBuilder {
                     reachableLeafIds = reachable,
                     unresolved = unresolved,
                     packageName = packageName,
+                    flows = readFlows(root, fqToId),
                 )
             }
         } catch (e: Exception) {

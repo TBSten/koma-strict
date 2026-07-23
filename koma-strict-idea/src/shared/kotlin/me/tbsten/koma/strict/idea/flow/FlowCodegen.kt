@@ -46,7 +46,8 @@ fun generateFlowSpec(model: StoreDiagramModel, flow: RecordedFlow, flowName: Str
         append(steps).append('\n')
         append("    ],\n")
         append(")\n")
-        append("annotation class ").append(flowName)
+        // 宣言は XxxState.flows.kt に置くソースレベル注釈なので module-local (internal) にする (flows-design.md)。
+        append("internal annotation class ").append(flowName)
     }
     val imports = buildList {
         add("$KOMA_STRICT_PKG.FlowSpec")

@@ -30,6 +30,13 @@ data class StoreDiagramModel(
     val error: String? = null,
     /** Package of the `@StoreSpec` root's file, e.g. `com.example.feed` (for generated test files); empty in pure tests. */
     val packageName: String = "",
+    /**
+     * Named `@FlowSpec` paths declared on the root (`flows-design.md`), for the diagram's flow dropdown /
+     * step playback. Empty when the store declares none, and always empty for a [degraded] model (flows
+     * need resolved triggers). Each flow's steps carry model references; the diagram layer resolves them
+     * to concrete nodes / edges at playback time.
+     */
+    val flows: List<DiagramFlow> = emptyList(),
 ) {
     /** All concrete leaves of the store (source order). */
     val leaves: List<LeafState> get() = root.leaves()

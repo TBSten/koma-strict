@@ -36,6 +36,7 @@ import me.tbsten.koma.strict.idea.ui.diagram.DiagramColors
 import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
 import me.tbsten.koma.strict.idea.ui.diagram.StoreDiagram
 import me.tbsten.koma.strict.idea.ui.diagram.copyDiagramImageToClipboard
+import me.tbsten.koma.strict.idea.ui.diagram.flowReveal
 import me.tbsten.koma.strict.idea.ui.diagram.focusFrom
 import me.tbsten.koma.strict.idea.ui.diagram.rememberDiagramColors
 import org.jetbrains.jewel.foundation.theme.JewelTheme
@@ -129,6 +130,21 @@ fun KomaStrictToolWindowContent(
             state.focus.select(focus)
         }
 
+        // Flow 再生 (flows-design.md): 選択フローの reveal 列を graph から解決し、0.15s ごとに 1 ステップずつ
+        // 明るくする (累積)。graph が無い / 未選択なら空。記録開始時に flowPlayback.clear() で排他にする。
+        val playbackGraph = prepared.getOrNull()?.first
+        val flowRevealList = remember(playbackGraph, state.flowPlayback.selected) {
+            val flow = state.flowPlayback.selected
+            if (playbackGraph != null && flow != null) playbackGraph.flowReveal(flow) else emptyList()
+        }
+        LaunchedEffect(state.flowPlayback.selected, playbackGraph) {
+            if (state.flowPlayback.selected == null) return@LaunchedEffect
+            for (i in 1..flowRevealList.size) {
+                state.flowPlayback.revealNext()
+                delay(150)
+            }
+        }
+
         // "Copy image": 現在の図をオフスクリーン描画してクリップボードへ。図が描けている時だけ出す。
         // density / layoutDirection / TextMeasurer は composition から取り、描画は画面と同一パス (drawDiagram) を使う。
         val density = LocalDensity.current
@@ -164,6 +180,8 @@ fun KomaStrictToolWindowContent(
             onCopyImage = onCopyImage,
             recording = recording.recording,
             onToggleRecording = {
+                // 記録と flow 再生は排他: 記録トグル時は再生を止める。
+                state.flowPlayback.clear()
                 // 開始時に State を1つ選択中なら、それを initial にする (無ければ宣言 initial)。
                 val selectedInitial = state.focus.selection
                     .filterIsInstance<DiagramSelection.Node>()
@@ -171,6 +189,9 @@ fun KomaStrictToolWindowContent(
                     ?.takeIf { model.leaf(it) != null }
                 recording.toggleRecording(model, selectedInitial)
             },
+            flows = model.flows,
+            selectedFlow = state.flowPlayback.selected,
+            onSelectFlow = state.flowPlayback::select,
         )
         Divider(colors)
         // 全 degrade (名前のみ) と partial (一部の参照が未解決) を区別して明示する。
@@ -203,6 +224,11 @@ fun KomaStrictToolWindowContent(
                             // 記録できた矢印は即 focus (0.3 秒見せる)。記録できないクリックは無視 = 非選択。
                             // 0.3 秒後は上の LaunchedEffect が遷移後 cursor の recordable へ focus を移す。
                             onRecordTap = { sel -> if (recording.record(sel, model)) state.focus.select(setOf(sel)) },
+                            // flow 再生中は revealed 分だけを強調表示 (累積)。クリックで再生解除。
+                            flowReveal = state.flowPlayback.selected?.let {
+                                flowRevealList.take(state.flowPlayback.revealedCount).toSet()
+                            },
+                            onInteract = { state.flowPlayback.clear() },
                         )
                     },
                     onFailure = { RenderErrorGuidance(it, colors) },

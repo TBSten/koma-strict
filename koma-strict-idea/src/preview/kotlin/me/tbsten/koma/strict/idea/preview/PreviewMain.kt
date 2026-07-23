@@ -23,6 +23,8 @@ import me.tbsten.koma.strict.idea.ir.NodeId
 import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.LayoutConfig
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
+import me.tbsten.koma.strict.idea.model.DiagramFlow
+import me.tbsten.koma.strict.idea.model.DiagramFlowStep
 import me.tbsten.koma.strict.idea.model.RootState
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StateId
@@ -34,6 +36,7 @@ import me.tbsten.koma.strict.idea.ui.component.FlowRecorderPanel
 import me.tbsten.koma.strict.idea.ui.component.RecordingPill
 import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
 import me.tbsten.koma.strict.idea.ui.diagram.StoreDiagram
+import me.tbsten.koma.strict.idea.ui.diagram.flowReveal
 import me.tbsten.koma.strict.idea.ui.diagram.rememberDiagramColors
 import me.tbsten.koma.strict.idea.ui.diagram.rememberSelectionState
 import me.tbsten.koma.strict.idea.ui.diagram.rememberZoomState
@@ -224,6 +227,15 @@ private fun renderAll(outDir: File) {
             )
         }
     }
+    // Flow ステップ再生の完成フレーム (flows-design.md / 参照 Loading-enter->IdleFlow.png)。
+    // Loading -enter-> Stable.Idle の flow を full reveal し、枠 + 矢印だけ accent 強調、他は
+    // composite コンテナ含め減光することを確認する (flowFocusFrom = 隣接拡張なし)。
+    render(outDir, "flow-feed-loading-idle", 760, 820, dark = false) {
+        DiagramTbFlowPreview(SampleModels.feed()) { loadingToIdleFlow() }
+    }
+    render(outDir, "flow-feed-loading-idle", 760, 820, dark = true) {
+        DiagramTbFlowPreview(SampleModels.feed()) { loadingToIdleFlow() }
+    }
     // TB では @OnExit バッジがノード下に出る (兄弟と重ならない) ことを確認する。
     render(outDir, "auth-tb-canvas", 900, 580, dark = false) { DiagramTbPreview(SampleModels.auth()) }
     render(outDir, "settings-canvas", 1070, 360, dark = false) { DiagramLrPreview(SampleModels.settings()) }
@@ -333,6 +345,30 @@ private fun DiagramLrFocusPreview(model: StoreDiagramModel, selection: (DiagramG
     val graph = GraphLowering.lower(model)
     val layout = LayeredLayout.layout(graph, LayoutDirection.LR, LayoutConfig(layerGap = 208.0, siblingGap = 60.0))
     StoreDiagram(graph = graph, layout = layout, colors = rememberDiagramColors(), selectionState = rememberSelectionState(selection(graph)))
+}
+
+/** The `Loading -enter-> Stable.Idle` flow used by the flow-playback preview (matches the reference mockup). */
+private fun loadingToIdleFlow(): DiagramFlow = DiagramFlow(
+    name = "initialize happy path",
+    steps = listOf(
+        DiagramFlowStep.Node(StateId("Loading")),
+        DiagramFlowStep.Enter,
+        DiagramFlowStep.Node(StateId("Stable", "Idle")),
+    ),
+)
+
+/**
+ * Renders the TB canvas with a flow **fully revealed** (`flows-design.md`) so the flow-playback highlight
+ * shows up in a golden PNG (playback is interactive / timed, so it never appears otherwise). The flow's
+ * frames + arrows are lit and everything else — including composite containers — dims ([flowReveal] +
+ * `flowFocusFrom`).
+ */
+@Composable
+private fun DiagramTbFlowPreview(model: StoreDiagramModel, flow: (DiagramGraph) -> DiagramFlow) {
+    val graph = GraphLowering.lower(model)
+    val layout = LayeredLayout.layout(graph, LayoutDirection.TB, LayoutConfig(layerGap = 128.0, siblingGap = 60.0))
+    val reveal = graph.flowReveal(flow(graph)).toSet()
+    StoreDiagram(graph = graph, layout = layout, colors = rememberDiagramColors(), flowReveal = reveal)
 }
 
 private fun render(outDir: File, name: String, width: Int, height: Int, dark: Boolean, content: @Composable () -> Unit) {

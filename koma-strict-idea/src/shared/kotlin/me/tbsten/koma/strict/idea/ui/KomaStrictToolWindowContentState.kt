@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
 import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
+import me.tbsten.koma.strict.idea.ui.diagram.FlowPlaybackState
 import me.tbsten.koma.strict.idea.ui.diagram.SelectionState
 import me.tbsten.koma.strict.idea.ui.diagram.ZoomState
 
@@ -32,6 +33,9 @@ class KomaStrictToolWindowContentState(stores: List<StoreDiagramModel>) {
     /** Focus selection (`ide-3.md`). */
     val focus = SelectionState()
 
+    /** Flow playback selection (`flows-design.md`): the flow dropdown + step reveal. */
+    val flowPlayback = FlowPlaybackState()
+
     /** The currently shown store model. */
     val model: StoreDiagramModel get() = store.model
 
@@ -43,6 +47,8 @@ class KomaStrictToolWindowContentState(stores: List<StoreDiagramModel>) {
     fun selectStore(index: Int) {
         store.select(index)
         focus.clear()
+        // 選択中フローは旧 store のノードを参照するので再生も止める。
+        flowPlayback.clear()
     }
 }
 

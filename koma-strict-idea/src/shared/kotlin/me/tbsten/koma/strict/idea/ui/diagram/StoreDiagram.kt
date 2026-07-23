@@ -68,14 +68,25 @@ fun StoreDiagram(
     selectionState: SelectionState = rememberSelectionState(),
     recording: Boolean = false,
     onRecordTap: (DiagramSelection) -> Unit = {},
+    /**
+     * Flow-playback highlight (`flows-design.md`): when non-null, exactly these revealed nodes / edges
+     * are lit and everything else dims ([flowFocusFrom]), overriding the click selection. Null = normal.
+     */
+    flowReveal: Set<DiagramSelection>? = null,
+    /** Fired on any (non-recording) tap — the tool window uses it to stop flow playback on interaction. */
+    onInteract: () -> Unit = {},
 ) {
     val tm = rememberTextMeasurer()
     // エッジ当たり判定用のルート (dp)。描画側 drawDiagram も同じ routeAll を使うので判定と描画が一致する
     // (routeAll は純関数で決定的なので別計算でも同一結果)。tap 当たり判定にも渡す。
     val routes = remember(graph, layout) { EdgeRouting.routeAll(graph, layout) }
-    // フォーカス集合。選択が空なら null = 全要素を通常描画 (既存の見た目)。
-    val focus = remember(graph, selectionState.selection) {
-        selectionState.selection.takeIf { it.isNotEmpty() }?.let { graph.focusFrom(it) }
+    // フォーカス集合。flow 再生中は revealed した要素だけを強調し他を減光 (flowFocusFrom)。
+    // 再生していなければ従来どおり click 選択から算出 (選択が空なら null = 全要素を通常描画)。
+    val focus = remember(graph, selectionState.selection, flowReveal) {
+        when {
+            flowReveal != null -> flowFocusFrom(flowReveal)
+            else -> selectionState.selection.takeIf { it.isNotEmpty() }?.let { graph.focusFrom(it) }
+        }
     }
     // ラベル矩形・自己ループ/scope-stay 弧の描画時ジオメトリを毎フレーム受け取り、tap の当たり判定に使う。
     val sink = remember(graph, layout) { DiagramInteractionSink() }
@@ -104,7 +115,7 @@ fun StoreDiagram(
                     .size(canvasW.dp, canvasH.dp)
                     .pinchZoom(zoomState)
                     .ctrlWheelZoom(zoomState)
-                    .diagramTapSelection(hitContext, selectionState, onNavigate, recording, onRecordTap),
+                    .diagramTapSelection(hitContext, selectionState, onNavigate, recording, onRecordTap, onInteract),
             ) {
                 // DrawScope 全体を renderZoom 倍 (原点固定) して描く。テキストも一緒にスケールする。
                 // sink には pre-scale px でラベル/弧が記録される (tap 側で offset/renderZoom と突き合わせる)。
@@ -163,12 +174,14 @@ private fun Modifier.diagramTapSelection(
     onNavigate: (SourceAnchor) -> Unit,
     recording: Boolean,
     onRecordTap: (DiagramSelection) -> Unit,
+    onInteract: () -> Unit,
 ): Modifier {
     val latestOnNavigate by rememberUpdatedState(onNavigate)
     // recording / onRecordTap は toggle で変わるので rememberUpdatedState 経由で最新を読む
     // (pointerInput は座標系入力だけで re-key し、モード変更で判定器を作り直さない)。
     val latestRecording by rememberUpdatedState(recording)
     val latestOnRecordTap by rememberUpdatedState(onRecordTap)
+    val latestOnInteract by rememberUpdatedState(onInteract)
     // Shift 併用 (複数選択) 判定のため window の keyboard modifiers を tap 時に読む。
     val windowInfo = LocalWindowInfo.current
     return pointerInput(hit.graph, hit.layout, hit.renderZoom) {
@@ -180,6 +193,8 @@ private fun Modifier.diagramTapSelection(
                 val sel = tap.selection
                 if (sel is DiagramSelection.Edge || sel is DiagramSelection.Stay) latestOnRecordTap(sel)
             } else {
+                // 図をクリックしたら flow 再生は解除する (flows-design.md の「図クリックで解除」)。
+                latestOnInteract()
                 selectionState.onTap(
                     hit = tap.selection,
                     shift = windowInfo.keyboardModifiers.isShiftPressed,

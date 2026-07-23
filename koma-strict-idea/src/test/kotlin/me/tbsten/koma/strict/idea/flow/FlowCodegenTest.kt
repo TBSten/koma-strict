@@ -42,7 +42,7 @@ class FlowCodegenTest {
                     FlowStep(FeedState.Stable.Idle::class),
                 ],
             )
-            annotation class RecordedFlow
+            internal annotation class RecordedFlow
         """.trimIndent()
         assertEquals(expected, spec.declaration)
         assertEquals("RecordedFlow", spec.annotationClassName)
@@ -74,7 +74,7 @@ class FlowCodegenTest {
         assertTrue(spec.declaration.contains("FlowStep(FeedState.Stable.Idle::class),"))
         assertTrue(spec.declaration.contains("FlowStep(FeedAction.LoadMore::class),"))
         assertTrue(spec.declaration.contains("FlowStep(Stay::class),"))
-        assertTrue(spec.declaration.contains("annotation class LoadMoreExhaustedFlow"))
+        assertTrue(spec.declaration.contains("internal annotation class LoadMoreExhaustedFlow"))
         assertTrue(spec.declaration.contains("name = \"load more exhausted flow\""))
         assertContainsAll(spec.requiredImports, "me.tbsten.koma.strict.Stay")
     }

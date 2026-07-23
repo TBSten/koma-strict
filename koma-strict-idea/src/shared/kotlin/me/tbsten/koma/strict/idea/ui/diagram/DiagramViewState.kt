@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import me.tbsten.koma.strict.idea.model.DiagramFlow
 
 // 要求 zoom の下限/上限と、+/- ボタン 1 押しの加算幅 (`ide.md`)。
 private const val MIN_ZOOM = 0.5f
@@ -71,6 +72,37 @@ class SelectionState(initial: Set<DiagramSelection> = emptySet()) {
 @Composable
 fun rememberSelectionState(initial: Set<DiagramSelection> = emptySet()): SelectionState =
     remember { SelectionState(initial) }
+
+/**
+ * Flow playback state (`flows-design.md` IDE section): the flow picked in the header dropdown
+ * ([selected]; null = none) and how many of its reveal steps have played so far ([revealedCount]). A
+ * stable holder so the dropdown mutates it and the diagram reads it; the 0.15s step timer lives in the
+ * composable. The diagram highlights `flowReveal(selected).take(revealedCount)` while [selected] is set.
+ */
+@Stable
+class FlowPlaybackState {
+    var selected: DiagramFlow? by mutableStateOf(null)
+        private set
+    var revealedCount: Int by mutableStateOf(0)
+        private set
+
+    /** Pick a flow (or clear with null) and restart its playback from the first step. */
+    fun select(flow: DiagramFlow?) {
+        selected = flow
+        revealedCount = 0
+    }
+
+    /** Reveal one more step. */
+    fun revealNext() {
+        revealedCount += 1
+    }
+
+    /** Stop playback and clear the selection. */
+    fun clear() {
+        selected = null
+        revealedCount = 0
+    }
+}
 
 /**
  * The selection after tapping [hit] over [current] (`ide-3.md`). Shift toggles the target into a

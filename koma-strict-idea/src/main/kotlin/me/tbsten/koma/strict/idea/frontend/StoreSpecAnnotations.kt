@@ -1,6 +1,8 @@
 package me.tbsten.koma.strict.idea.frontend
 
 import me.tbsten.koma.strict.idea.model.ActionTrigger
+import me.tbsten.koma.strict.idea.model.DiagramFlow
+import me.tbsten.koma.strict.idea.model.DiagramFlowStep
 import me.tbsten.koma.strict.idea.model.EnterTrigger
 import me.tbsten.koma.strict.idea.model.ExitInfo
 import me.tbsten.koma.strict.idea.model.RecoverTrigger
@@ -10,6 +12,8 @@ import me.tbsten.koma.strict.idea.model.UNRESOLVED_MARKER
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
+import org.jetbrains.kotlin.analysis.api.base.KaConstantValue
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.types.KaClassType
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtClassOrObject
@@ -24,6 +28,7 @@ internal object KomaStrictFq {
     const val ON_ACTION: String = "$PKG.OnAction"
     const val ON_RECOVER: String = "$PKG.OnRecover"
     const val STAY: String = "$PKG.Stay"
+    const val FLOW_SPEC: String = "$PKG.FlowSpec"
 }
 
 /** The triggers resolved for one state node. */
@@ -74,6 +79,66 @@ internal fun KaSession.readInitial(root: KtClassOrObject, fqToId: Map<String, St
         ?: return ResolvedInitial(emptyList(), unresolved = false)
     val ns = readNextStateNamed(storeSpec, "initial", fqToId)
     return ResolvedInitial(ns.targets, unresolved = ns.unresolvedTargets.isNotEmpty())
+}
+
+/**
+ * Reads the `@FlowSpec` flows declared on [root] (`flows-design.md` IDE section). Each annotation on the
+ * root whose **annotation class** itself carries `@FlowSpec` (the direct form — `@ExampleFlow` on the
+ * root, `@FlowSpec … annotation class ExampleFlow` in the flows file) becomes one [DiagramFlow]. The
+ * annotation class is resolved via [findClass] so it works regardless of which file the declaration
+ * lives in (same compilation unit, SOURCE retention). Grouping annotations (a class bundling several
+ * flow annotations) are a TODO — v1 reads the direct form only.
+ */
+internal fun KaSession.readFlows(root: KtClassOrObject, fqToId: Map<String, StateId>): List<DiagramFlow> {
+    val flows = mutableListOf<DiagramFlow>()
+    for (ann in root.symbol.annotations) {
+        val annClassId = ann.classId ?: continue
+        val annClass = findClass(annClassId) ?: continue
+        val flowSpec = annClass.annotations.firstOrNull { it.classId?.asFqNameString() == KomaStrictFq.FLOW_SPEC } ?: continue
+        flows += readFlowSpec(flowSpec, defaultName = annClassId.shortClassName.asString(), fqToId, source = ann.entryAnchor())
+    }
+    return flows
+}
+
+/** Builds one [DiagramFlow] from a resolved `@FlowSpec` annotation. [defaultName] is the flow annotation class name. */
+private fun KaSession.readFlowSpec(
+    flowSpec: KaAnnotation,
+    defaultName: String,
+    fqToId: Map<String, StateId>,
+    source: SourceAnchor?,
+): DiagramFlow {
+    val declaredName = (flowSpec.arguments.firstOrNull { it.name.asString() == "name" }?.expression as? KaAnnotationValue.ConstantValue)
+        ?.let { (it.value as? KaConstantValue.StringValue)?.value }
+        ?.takeIf { it.isNotBlank() }
+    val steps = flowStepClassTypes(flowSpec).map { classifyStepRef(it, fqToId) }
+    return DiagramFlow(name = declaredName ?: defaultName, steps = steps, source = source)
+}
+
+/** The resolved `KClass` of each `FlowStep(ref::class)` element of `steps = [...]`; null for an unresolvable element. */
+private fun flowStepClassTypes(flowSpec: KaAnnotation): List<KaClassType?> {
+    val array = flowSpec.arguments.firstOrNull { it.name.asString() == "steps" }?.expression as? KaAnnotationValue.ArrayValue
+        ?: return emptyList()
+    return array.values.map { value ->
+        val nested = (value as? KaAnnotationValue.NestedAnnotationValue)?.annotation ?: return@map null
+        val refArg = nested.arguments.firstOrNull { it.name.asString() == "ref" }?.expression
+        (refArg as? KaAnnotationValue.ClassLiteralValue)?.type as? KaClassType
+    }
+}
+
+/**
+ * Classifies one `FlowStep` reference into a [DiagramFlowStep]. A `Stay` / `OnEnter` marker and an
+ * in-store state (via [fqToId]) are recognized by fully-qualified name; anything else is an action /
+ * exception edge kept by its package-relative ref ([DiagramFlowStep.Trigger]), matched against a
+ * `GraphEdge.triggerTypeRef` at playback time (so action vs recover never has to be told apart here).
+ */
+private fun classifyStepRef(refType: KaClassType?, fqToId: Map<String, StateId>): DiagramFlowStep {
+    val classId = refType?.classId ?: return DiagramFlowStep.Unresolved
+    val fq = classId.asFqNameString()
+    return when {
+        fq == KomaStrictFq.STAY -> DiagramFlowStep.Stay
+        fq == KomaStrictFq.ON_ENTER -> DiagramFlowStep.Enter
+        else -> fqToId[fq]?.let { DiagramFlowStep.Node(it) } ?: DiagramFlowStep.Trigger(classId.relativeClassName.asString())
+    }
 }
 
 private fun KaSession.readActions(

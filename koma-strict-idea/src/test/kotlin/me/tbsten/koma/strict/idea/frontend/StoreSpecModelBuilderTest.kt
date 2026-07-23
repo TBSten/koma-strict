@@ -8,6 +8,7 @@ import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
 import me.tbsten.koma.strict.idea.ir.StartNode
 import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
+import me.tbsten.koma.strict.idea.model.DiagramFlowStep
 import me.tbsten.koma.strict.idea.model.GroupState
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StateId
@@ -68,6 +69,45 @@ internal class StoreSpecModelBuilderTest : BasePlatformTestCase() {
 
         // 全 leaf が到達可能。
         assertEquals(model.leaves.map { it.id }.toSet(), model.reachableLeafIds)
+    }
+
+    // @FlowSpec を付けた注釈クラスを root に適用した flow が model.flows に読み込まれ、
+    // steps が Node / Enter / Trigger に分類される (flows-design.md IDE 読取)。name は @FlowSpec(name) 優先、
+    // 省略時は注釈クラス名。宣言が別ファイル (XxxState.flows.kt) でも findClass で解決できることも兼ねる。
+    fun testFlowsAreReadFromRootAnnotations() {
+        val (model, _) = buildFrom(
+            FLOW_DEMO_SRC,
+            extraFiles = mapOf("FlowDemoState.flows.kt" to FLOW_DEMO_FLOWS_SRC),
+        )
+        assertFalse("解析成功", model.degraded)
+
+        val byName = model.flows.associateBy { it.name }
+        assertEquals(setOf("initialize happy path", "RetryFlow"), byName.keys)
+
+        // name は @FlowSpec(name) を優先。steps は node / enter に分類。
+        assertEquals(
+            listOf(
+                DiagramFlowStep.Node(StateId("Loading")),
+                DiagramFlowStep.Enter,
+                DiagramFlowStep.Node(StateId("Content")),
+            ),
+            byName.getValue("initialize happy path").steps,
+        )
+        // name 省略 → 注釈クラス名。action ステップは Trigger(relativeClassName)、EdgeKind は区別しない。
+        assertEquals(
+            listOf(
+                DiagramFlowStep.Node(StateId("Error")),
+                DiagramFlowStep.Trigger("FlowDemoAction.Retry"),
+                DiagramFlowStep.Node(StateId("Loading")),
+            ),
+            byName.getValue("RetryFlow").steps,
+        )
+    }
+
+    // @FlowSpec の無いストアは flows 空。
+    fun testStoreWithoutFlowsHasEmptyFlows() {
+        val (model, _) = buildFrom(LCE_SRC)
+        assertTrue("flow 宣言が無ければ空", model.flows.isEmpty())
     }
 
     // lowering / layout も実 model から通ることをスモーク確認する。
@@ -570,6 +610,10 @@ private val KOMA_STRICT_STUB = """
     @Target(AnnotationTarget.CLASS)
     annotation class OnRecover<E>(val nextState: Array<KClass<*>> = [], val emit: Array<KClass<*>> = [])
     class Stay
+    @Target()
+    annotation class FlowStep(val ref: KClass<*>)
+    @Target(AnnotationTarget.CLASS)
+    annotation class FlowSpec(val name: String = "", val steps: Array<FlowStep> = [])
 """.trimIndent()
 
 // 編集途中を模す壊れコード: 未解決の型引数 (Nonexistent.Foo)・存在しない nextState (Ghost)・
@@ -814,6 +858,61 @@ private val UNRESOLVED_SRC = """
         @OnEnter(nextState = [A::class, Ghost::class], emit = [UnresolvedEvent.Real::class, MissingEvt::class])
         interface B : UnresolvedState { companion object }
     }
+""".trimIndent()
+
+// @FlowSpec 読取用: root に 2 つの flow 注釈を適用。宣言は別ファイル (FLOW_DEMO_FLOWS_SRC) に置き、
+// 別ファイルでも findClass で解決できる = 実運用 (XxxState.flows.kt 分離) と同じ配置で検証する。
+private val FLOW_DEMO_SRC = """
+    import me.tbsten.koma.strict.StoreSpec
+    import me.tbsten.koma.strict.OnEnter
+    import me.tbsten.koma.strict.OnAction
+
+    interface State
+    interface Action
+
+    @StoreSpec(initial = [FlowDemoState.Loading::class])
+    @InitializeHappyPathFlow
+    @RetryFlow
+    sealed interface FlowDemoState : State {
+        companion object
+
+        @OnEnter(nextState = [Content::class, Error::class])
+        interface Loading : FlowDemoState { companion object }
+
+        @OnAction<FlowDemoAction.Retry>(nextState = [Loading::class])
+        interface Error : FlowDemoState { companion object }
+
+        interface Content : FlowDemoState { companion object }
+    }
+
+    sealed interface FlowDemoAction : Action {
+        data object Retry : FlowDemoAction
+    }
+""".trimIndent()
+
+private val FLOW_DEMO_FLOWS_SRC = """
+    import me.tbsten.koma.strict.FlowSpec
+    import me.tbsten.koma.strict.FlowStep
+    import me.tbsten.koma.strict.OnEnter
+
+    @FlowSpec(
+        name = "initialize happy path",
+        steps = [
+            FlowStep(FlowDemoState.Loading::class),
+            FlowStep(OnEnter::class),
+            FlowStep(FlowDemoState.Content::class),
+        ],
+    )
+    internal annotation class InitializeHappyPathFlow
+
+    @FlowSpec(
+        steps = [
+            FlowStep(FlowDemoState.Error::class),
+            FlowStep(FlowDemoAction.Retry::class),
+            FlowStep(FlowDemoState.Loading::class),
+        ],
+    )
+    internal annotation class RetryFlow
 """.trimIndent()
 
 private val LCE_SRC = """

@@ -185,6 +185,36 @@ internal fun DiagramGraph.focusFrom(selections: Set<DiagramSelection>): FocusSet
     )
 }
 
+/**
+ * A focus set for **flow playback** (`flows-design.md` IDE section): exactly the [revealed] nodes /
+ * edges are bright (tier 1 emphasis), everything else dims. Unlike [focusFrom] this does **not** expand
+ * to a selection's neighbours — a revealed edge lights only itself, not its endpoint nodes — so a flow's
+ * path lights up one step at a time against a uniformly dimmed rest (including composite containers),
+ * matching the reference mockup. No graph is needed: the revealed set is exactly what stays bright.
+ */
+internal fun flowFocusFrom(revealed: Set<DiagramSelection>): FocusSet {
+    val nodeIds = mutableSetOf<NodeId>()
+    val edges = mutableSetOf<GraphEdge>()
+    val stays = mutableSetOf<ScopeStay>()
+    val composites = mutableSetOf<NodeId>()
+    for (sel in revealed) when (sel) {
+        is DiagramSelection.Node -> nodeIds += sel.id
+        is DiagramSelection.Edge -> edges += sel.edge
+        is DiagramSelection.Composite -> composites += sel.id
+        is DiagramSelection.Stay -> stays += sel.stay
+    }
+    return FocusSet(
+        nodeIds = nodeIds,
+        edges = edges,
+        scopeStays = stays,
+        compositeIds = composites,
+        selectedNodes = nodeIds,
+        selectedEdges = edges,
+        selectedComposites = composites,
+        selectedStays = stays,
+    )
+}
+
 /** Composite boxes whose path is an ancestor of (or equal to) any of [paths] — the boxes to keep bright. */
 private fun DiagramGraph.compositesCovering(paths: Collection<StateId>): Set<NodeId> =
     composites.filter { box -> paths.any { box.path.containsOrEquals(it) } }.mapTo(mutableSetOf()) { it.id }
