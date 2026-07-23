@@ -65,7 +65,13 @@ dependencies {
     // preview: standalone Compose Desktop + Jewel Int UI。plugin distribution には載せない。
     // renderComposeScene は compose.desktop.currentOs (Skiko 同梱) にある。
     previewImplementation(compose.desktop.currentOs)
-    previewImplementation("org.jetbrains.jewel:jewel-int-ui-standalone:0.37.0-261.26222.65")
+
+    val jewelForIde = "261.26222.65"
+    previewImplementation("org.jetbrains.jewel:jewel-int-ui-standalone:0.37.0-$jewelForIde")
+    // AllIconsKeys (IDE バンドルアイコン) を standalone preview の classpath にも載せる。
+    // これが無いと preview では platform アイコンが解決できずマゼンタのプレースホルダになる
+    // (Jewel README「Icons」参照)。実 plugin は platform から解決するので不要。
+    previewImplementation("com.jetbrains.intellij.platform:icons:$jewelForIde")
 }
 
 kotlin {

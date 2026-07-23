@@ -6,18 +6,32 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.renderComposeScene
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import me.tbsten.koma.strict.idea.SampleModels
+import me.tbsten.koma.strict.idea.flow.FlowTransition
+import me.tbsten.koma.strict.idea.flow.RecordedFlow
 import me.tbsten.koma.strict.idea.ir.DiagramGraph
+import me.tbsten.koma.strict.idea.ir.EdgeKind
 import me.tbsten.koma.strict.idea.ir.GraphLowering
 import me.tbsten.koma.strict.idea.ir.NodeId
 import me.tbsten.koma.strict.idea.layout.layered.LayeredLayout
 import me.tbsten.koma.strict.idea.layout.LayoutConfig
 import me.tbsten.koma.strict.idea.layout.LayoutDirection
+import me.tbsten.koma.strict.idea.model.RootState
+import me.tbsten.koma.strict.idea.model.SourceAnchor
+import me.tbsten.koma.strict.idea.model.StateId
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
+import me.tbsten.koma.strict.idea.ui.FlowPanelTab
 import me.tbsten.koma.strict.idea.ui.KomaStrictToolWindowContent
+import me.tbsten.koma.strict.idea.ui.RecordingState
+import me.tbsten.koma.strict.idea.ui.component.FlowRecorderPanel
+import me.tbsten.koma.strict.idea.ui.component.RecordingPill
 import me.tbsten.koma.strict.idea.ui.diagram.DiagramSelection
 import me.tbsten.koma.strict.idea.ui.diagram.StoreDiagram
 import me.tbsten.koma.strict.idea.ui.diagram.rememberDiagramColors
@@ -218,6 +232,79 @@ private fun renderAll(outDir: File) {
     render(outDir, "session", 1040, 360, dark = false) { KomaStrictToolWindowContent(listOf(SampleModels.session())) }
     render(outDir, "session", 1040, 360, dark = true) { KomaStrictToolWindowContent(listOf(SampleModels.session())) }
     render(outDir, "session-canvas", 1040, 360, dark = false) { DiagramLrPreview(SampleModels.session()) }
+    // Flow Recorder パネル (ide-test-code-flow-spec.png)。記録済み flow を seed して 3 タブを描画する。
+    render(outDir, "flowspec-panel", 520, 640, dark = false) { FlowSpecPanelPreview(FlowPanelTab.FlowSpec) }
+    render(outDir, "flowspec-panel", 520, 640, dark = true) { FlowSpecPanelPreview(FlowPanelTab.FlowSpec) }
+    render(outDir, "flow-steps-panel", 520, 400, dark = false) { FlowSpecPanelPreview(FlowPanelTab.Steps) }
+    // 狭幅: 遷移内容は横スクロールにクリップされ、× が右端に残る (崩れない) ことを確認する。
+    render(outDir, "flow-steps-narrow", 300, 360, dark = false) { FlowSpecPanelPreview(FlowPanelTab.Steps) }
+    render(outDir, "flow-testcode-panel", 520, 400, dark = false) { FlowSpecPanelPreview(FlowPanelTab.TestCode) }
+    // 記録ピル (展開 / 最小化 = record ドット 1 個)。
+    render(outDir, "flow-pill", 560, 72, dark = false) { FlowPillPreview(minimized = false) }
+    render(outDir, "flow-pill-min", 72, 72, dark = false) { FlowPillPreview(minimized = true) }
+    // 狭幅: FlowRow で View Test Code などが次の行に折り返り、潰れない (横幅不足時の確認)。
+    render(outDir, "flow-pill-narrow", 260, 180, dark = false) { FlowPillPreview(minimized = false) }
+    // 記録中の選択表示: cursor(Loading) から記録可能な transition だけ強調・他は減光 (選択不可の見た目)。
+    render(outDir, "flow-recordable", 1200, 520, dark = false) {
+        DiagramLrFocusPreview(SampleModels.feed()) { graph ->
+            RecordingState().apply { seed(RecordedFlow(initial = StateId("Loading")), panelOpen = false) }
+                .recordableSelections(graph)
+        }
+    }
+    // 注: パネル展開時の分割 (HorizontalSplitLayout) は layoutCoordinates 依存で単発 renderComposeScene
+    // では描画されない (実 IDE の live ComposePanel でのみ確認できる) ため preview scene は持たない。
+}
+
+/** The floating recording pill, expanded or minimized (`ide-test-code.png`). */
+@Composable
+private fun FlowPillPreview(minimized: Boolean) {
+    val model = SampleModels.feed()
+    val recording = remember {
+        RecordingState().apply {
+            seed(
+                flow = RecordedFlow(
+                    initial = StateId("Loading"),
+                    transitions = listOf(FlowTransition(EdgeKind.ENTER, null, "onEnter", StateId("Loading"), StateId("Error"))),
+                ),
+                tab = FlowPanelTab.Steps,
+                panelOpen = false,
+            )
+            pillMinimized = minimized
+        }
+    }
+    Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.CenterStart) {
+        RecordingPill(model, recording, rememberDiagramColors())
+    }
+}
+
+/** The recorder panel with the mockup scenario seeded, on [tab] (`ide-test-code-flow-spec.png`). */
+@Composable
+private fun FlowSpecPanelPreview(tab: FlowPanelTab) {
+    // codegen は root.simpleName だけ使う。source を入れて "Add to FeedState" を有効表示にする。
+    val model = StoreDiagramModel(root = RootState("FeedState", emptyList(), source = object : SourceAnchor {}), packageName = "com.example.feed")
+    val recording = remember {
+        RecordingState().apply {
+            seed(
+                flow = RecordedFlow(
+                    initial = StateId("Loading"),
+                    transitions = listOf(
+                        FlowTransition(EdgeKind.ENTER, null, "onEnter / LoadFailed", StateId("Loading"), StateId("Error")),
+                        FlowTransition(EdgeKind.ACTION, "FeedAction.Retry", "retry", StateId("Error"), StateId("Loading")),
+                        FlowTransition(EdgeKind.ENTER, null, "onEnter", StateId("Loading"), StateId("Stable", "Idle")),
+                    ),
+                ),
+                tab = tab,
+            )
+        }
+    }
+    FlowRecorderPanel(
+        model = model,
+        recording = recording,
+        colors = rememberDiagramColors(),
+        onCopyText = { true },
+        onInsertFlowSpec = {},
+        canInsert = true,
+    )
 }
 
 /** Renders just the canvas in top-to-bottom direction to eyeball the TB toggle. */
