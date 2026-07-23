@@ -34,8 +34,11 @@ jobs:
         include:
           # KSP processor の snapshot テスト (生成コードの正しさ = 本丸)
           - { name: "ksp processor", tasks: "test", os: ubuntu-latest }
-          # runtime / ksp:shared / integrationTest の JVM 振る舞いテスト
-          - { name: "jvm", tasks: "jvmTest", os: ubuntu-latest }
+          # runtime / ksp:shared の JVM 振る舞いテスト
+          - { name: "jvm", tasks: ":koma-strict-runtime:jvmTest :koma-strict-ksp:shared:jvmTest", os: ubuntu-latest }
+          # integrationTest: 実物 koma (Maven Central) に対する生成コードの E2E テスト。
+          # jvmTest 集約でも走るが、独立した CI チェックとして可視化し集約から取りこぼさないよう明示する。
+          - { name: "integration test", tasks: ":integrationTest:jvmTest", os: ubuntu-latest }
           # runtime / ksp:shared の JS・Wasm main コンパイル (browser test は karma 依存で不安定なため compile のみ)
           - { name: "js / wasm", tasks: "compileKotlinJs compileKotlinWasmJs", os: ubuntu-latest }
           # runtime の Android AAR コンパイル
