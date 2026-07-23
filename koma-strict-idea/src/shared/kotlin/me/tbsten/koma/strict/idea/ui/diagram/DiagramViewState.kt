@@ -9,8 +9,8 @@ import androidx.compose.runtime.setValue
 import me.tbsten.koma.strict.idea.model.DiagramFlow
 
 // 要求 zoom の下限/上限と、+/- ボタン 1 押しの加算幅 (`ide.md`)。
-private const val MIN_ZOOM = 0.5f
-private const val MAX_ZOOM = 2.5f
+private const val MIN_ZOOM = 0.05f
+private const val MAX_ZOOM = 4.0f
 private const val ZOOM_STEP = 0.15f
 
 /**
