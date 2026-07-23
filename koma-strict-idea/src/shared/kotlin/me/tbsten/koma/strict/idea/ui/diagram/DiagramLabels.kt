@@ -221,8 +221,10 @@ internal fun DrawScope.drawEdgeLabel(
             )
         }
     }
+    // ラベル下敷きは背景色のピルで線を「塗り消して」可読性を出すもの。ただし完全不透明だと線が
+    // 途切れて見えるので半透明にし、ラベル裏でも線がうっすら繋がって見えるようにする。
     drawRoundRect(
-        color = colors.background,
+        color = colors.background.copy(alpha = LABEL_BACKING_ALPHA),
         topLeft = Offset(box.left, box.top),
         size = Size(box.w, box.h),
         cornerRadius = corner(4f),
@@ -339,6 +341,9 @@ private const val LABEL_MIN_START_GAP = 12f
 
 // エッジラベルの最大幅 (dp)。これを超えるテキストは折り返す (表示領域を決めて改行する方針)。
 private const val LABEL_MAX_WIDTH_DP = 220
+
+// ラベル下敷きピルの不透明度。線を大部分塗り消しつつ、ラベル裏でも線がうっすら繋がって見えるようにする。
+private const val LABEL_BACKING_ALPHA = 0.75f
 
 /** Keeps a label center within [[margin], [extent] - [margin]] so its box stays on-canvas. */
 private fun clampToCanvas(value: Float, margin: Float, extent: Float): Float {
