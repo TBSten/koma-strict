@@ -15,10 +15,15 @@
       koma-strict が生成するのは builder 内で呼ぶ root の `states(...)` 拡張。receiver
       (`StoreBuilder<S, A, E>`)の型引数がどの store の states() かを選ぶため、
       `Store` の型引数は常に明示する。② **生成 per-store factory(追加の糖衣。同じ store を作る)**:
-      関数名 = root 名の末尾 `State` を strip して decapitalize + `Store`(`LceState` → `lceStore`)。
-      `initialState` → `states()` と同一の handler param 列 → `context: CoroutineContext? = null` →
-      末尾 `configuration`(store 全体のエスケープハッチ。trailing lambda として書ける)。
-      生成拡張・factory は宣言と同 package に生える
+      関数名 = root 名の末尾 `State` を strip して `create` / `restore` + `Store`
+      (`LceState` → `createLceStore` / `restoreLceStore`)の **2 つ**。`createLceStore` は
+      `@StoreSpec(initial = ...)` の候補ごとに 1 overload 生成され、`initialState` がその候補の
+      型に絞り込まれる(`initial` 未宣言なら生成されない)。`restoreLceStore` は `initialState` が
+      root 型のまま(任意の state から開始可・`initial` の有無に関わらず常に生成)。
+      永続化 state からの復元やテストでの途中 state 起動には `restoreLceStore` を使う。
+      どちらも `initialState` → `states()` と同一の handler param 列 →
+      `context: CoroutineContext? = null` → 末尾 `configuration`(store 全体のエスケープハッチ。
+      trailing lambda として書ける)。生成拡張・factory は宣言と同 package に生える
       (別 package から使う場合は import が必要。本サンプルは同 package 前提)
     - `states()` の param 型は **`{束}HandlersScope.() -> {束}Handlers`(receiver 付き関数型)で、
       値渡しと scope lambda の両対応**(param 名 = state 名 decapitalize)。
@@ -151,8 +156,9 @@ sealed interface LceEvent : Event {
 ### 利用側(user が書く)
 
 ```kotlin
-// 主: 生成 per-store factory 経由(型引数を書かない糖衣入口。命名 = root 名の末尾 State を strip + Store)
-val store = lceStore(
+// 主: 生成 per-store factory 経由(型引数を書かない糖衣入口。命名 = root 名の末尾 State を strip +
+// create/restore + Store。initialState を宣言済み initial 候補に絞り込む createLceStore を使う)
+val store = createLceStore(
     initialState = LceState.Loading(),
     loading = LceState.Loading.actions(
         enter = {
@@ -519,21 +525,48 @@ public fun StoreBuilder<LceState, LceAction, LceEvent>.states(
     }
 }
 
-// per-store factory: koma Store() + states() を包む糖衣(koma 直入口は正のまま併存)
+// per-store factory: koma Store() + states() を包む糖衣(koma 直入口は正のまま併存)。create/restore の 2 つ
 /**
  * Builds a [Store] for [LceState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<LceState, LceAction, LceEvent>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [LceState.Loading] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun lceStore(
-    initialState: LceState,
+public fun createLceStore(
+    initialState: LceState.Loading,                        // initial 候補ごとに 1 overload(型で絞り込み)
     loading: LoadingHandlersScope.() -> LoadingHandlers,   // states() と同一の handler param 列
     content: ContentHandlersScope.() -> ContentHandlers,
     error: ErrorHandlersScope.() -> ErrorHandlers,
     context: CoroutineContext? = null,                     // koma Store へ passthrough
     configuration: StoreBuilder<LceState, LceAction, LceEvent>.() -> Unit = {},   // 末尾 = 意図された trailing lambda(センチネル不要)
+): Store<LceState, LceAction, LceEvent> =
+    Store<LceState, LceAction, LceEvent>(initialState = initialState, context = context) {
+        states(
+            loading = loading,
+            content = content,
+            error = error,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [Store] for [LceState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<LceState, LceAction, LceEvent>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [LceState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createLceStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreLceStore(
+    initialState: LceState,                                // initial 未宣言でも常に生成される (root 型のまま)
+    loading: LoadingHandlersScope.() -> LoadingHandlers,
+    content: ContentHandlersScope.() -> ContentHandlers,
+    error: ErrorHandlersScope.() -> ErrorHandlers,
+    context: CoroutineContext? = null,
+    configuration: StoreBuilder<LceState, LceAction, LceEvent>.() -> Unit = {},
 ): Store<LceState, LceAction, LceEvent> =
     Store<LceState, LceAction, LceEvent>(initialState = initialState, context = context) {
         states(

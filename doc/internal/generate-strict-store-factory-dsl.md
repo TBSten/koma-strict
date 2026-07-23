@@ -131,8 +131,10 @@ sealed interface MyState : State {                   // koma.core.State
 ## 利用側 DSL — koma 標準 `Store {}` + 生成 `states()` 拡張 + per-store factory
 
 ```kotlin
-// (a) 生成 per-store factory 経由(型引数を書かない糖衣入口。命名 = root 名の末尾 State を strip + Store)
-val store = myStore(
+// (a) 生成 per-store factory 経由(型引数を書かない糖衣入口。命名 = root 名の末尾 State を strip +
+//     create/restore + Store。initialState を宣言済み initial 候補に絞り込む createMyStore を使う。
+//     任意の MyState から始めたいなら同一 param 列の restoreMyStore を使う)
+val store = createMyStore(
     initialState = MyState.Loading(query = ""),
     // 以下は states() と同一の handler param 列。
     // param 名 = state 名(decapitalize)、値 = companion 拡張 actions() / states() が作る Handlers
@@ -229,11 +231,18 @@ val store = Store<MyState, MyAction, MyEvent>(initialState = MyState.Loading(que
   **receiver(`StoreBuilder<MyState, MyAction, MyEvent>`)の型引数がどの store の states() かを選ぶ**
   ため、`Store` の型引数は常に明示する(A / E は initialState から推論できず、S は leaf 型に
   推論されてしまう)。② **生成 per-store factory(追加の糖衣。同じ store を作る)**:
-  関数名 = root 名の末尾 `State` を strip して decapitalize + `Store`
-  (`MyState` → `myStore`、`LceState` → `lceStore`。ネスト root は underPackageName 連結:
-  `FooScreen.State` → `fooScreenStore`)。シグネチャは
-  `initialState` → `states()` と同一の handler param 列 → `context: CoroutineContext? = null`
-  (koma `Store` へ passthrough)→ 末尾 `configuration: StoreBuilder<S, A, E>.() -> Unit = {}`
+  関数名 = root 名の末尾 `State` を strip して `create` / `restore` + `Store` の**2 つ**
+  (`MyState` → `createMyStore` / `restoreMyStore`、`LceState` → `createLceStore` /
+  `restoreLceStore`。ネスト root は underPackageName 連結: `FooScreen.State` →
+  `createFooScreenStore` / `restoreFooScreenStore`)。**`create{Root}Store` は
+  `@StoreSpec(initial = ...)` の宣言候補ごとに 1 overload 生成され、`initialState` がその候補
+  自身の型に絞り込まれる(コンパイル時強制)。`initial` が未宣言なら生成されない
+  (絞り込む先が無いため)。`restore{Root}Store` は `initialState` が root 型のまま
+  (任意の state から開始できる)で、`initial` の宣言有無に関わらず常に生成される** —
+  永続化 state からの復元やテストでの途中 state 起動に使う(2026-07-23 決定)。シグネチャは
+  どちらも `initialState` → `states()` と同一の handler param 列 →
+  `context: CoroutineContext? = null`(koma `Store` へ passthrough)→
+  末尾 `configuration: StoreBuilder<S, A, E>.() -> Unit = {}`
   (trailing lambda 位置 = store 全体のエスケープハッチ。生成 handler 登録の後に呼ばれる)。
   koma 直入口が正のまま併存するので、エコシステムの前提は変わらない
 - **param 名 = state 名の decapitalize、param 型 = `{束}HandlersScope.() -> {束}Handlers`
@@ -365,7 +374,7 @@ named-param 形式のコンパイル時網羅が正のまま併存し、builder 
 | 自宣言つき中間の `{Path}{DefaultName}Handlers` / 合成型 `{Path}Handlers` / `operator fun plus` | 中間自身の `actions(...)` が作る自宣言束と `states(子のみ)` の `GroupHandlers` を `plus` が合成型(親側 param 型)へ束ねる。片方忘れは型エラー。従来形 `states(default名 = ..., 子...)` overload は合成型を直接返す。escape block(`configure`)は `plus` でも GroupHandlers 側から合成型へ引き継がれる |
 | `{Prefix}StatesConfigureScope` + `states()` の escape param(`configure`) | `states()` の trailing escape block(per-state escape)の receiver。member = **宣言を持つ子 state 名のみ**(leaf member = その `state<...> {}` ブロック末尾へ、中間 sealed member = subtree 全 leaf へ展開する共有 escape)。同一 member の二重呼び出しは runtime の `throwDuplicateBuilderEntry` で fail-fast。**member ゼロの states() には生成せずセンチネル維持**。KDoc に重ね定義の合成規則(先勝ち・escape の位置づけ)を英語で明記 |
 | root `states()` 拡張(`MyState.storeSpec.generated.kt`) | `StoreBuilder<S, A, E>` への拡張(受け手の型引数が store を選ぶ)。state 網羅(必須 named param)+ koma `state<X>{}` へのコンパイルダウン(冒頭で scope lambda 型 param を `{束}HandlersScope().param()` で Handlers 値へ解決)。各 `state<X>{}` ブロック末尾で **leaf configure → 内側 states() escape → root escape** の順に適用(中間 sealed member は `StateHandlerConfig<..., 中間型>` への cast 適用・`@Suppress("UNCHECKED_CAST")`)。同名 clash は `@JvmName` で回避。**唯一の全体依存ファイル** |
-| per-store factory 関数(同じく storeSpec ファイル内) | `{root名 - State}Store(initialState, <states() と同一 param 列>, context = null, configuration = {})`。koma `Store()` + `states()` を包む糖衣。関数名は生成名衝突検出の対象(§KSP 静的検証) |
+| per-store factory 関数(同じく storeSpec ファイル内) | `create{root名 - State}Store` / `restore{root名 - State}Store` の 2 つ(いずれも `<states() と同一 param 列>, context = null, configuration = {})`)。koma `Store()` + `states()` を包む糖衣。`create` は `@StoreSpec(initial = ...)` 候補ごとに `initialState` を候補の型へ絞り込んだ 1 overload(`initial` 未宣言なら非生成)、`restore` は `initialState` が root 型のまま(常に生成)。関数名は生成名衝突検出の対象(§KSP 静的検証) |
 
 ファイル分割は KSP incremental の依存単位に一致: node の宣言変更 → その node のファイルだけ再生成。
 構造変更(state 増減)→ 親の `states()` ファイルと storeSpec ファイルが再生成。
