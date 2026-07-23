@@ -8,6 +8,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.ksp)
+    // 生成した kotest spec を動かせるように (ksp プラグインの後に適用する)。
+    alias(libs.plugins.kotest)
 }
 
 kotlin {
@@ -30,8 +32,22 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.koma.test)
+            // 生成テスト (kotlin.test scaffold) の runTest 用。
+            implementation(libs.kotlinx.coroutines.test)
+            // 生成テスト (kotest spec scaffold) 用の matcher / engine。
+            implementation(libs.kotest.assertions.core)
+            implementation(libs.kotest.framework.engine)
+        }
+        jvmTest.dependencies {
+            // kotest を JVM で走らせる JUnit5 runner。
+            implementation(libs.kotest.runner.junit5)
         }
     }
+}
+
+// kotest (と kotlin.test の JUnit5 自動バインド) は JUnit Platform で動く。
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    useJUnitPlatform()
 }
 
 dependencies {
