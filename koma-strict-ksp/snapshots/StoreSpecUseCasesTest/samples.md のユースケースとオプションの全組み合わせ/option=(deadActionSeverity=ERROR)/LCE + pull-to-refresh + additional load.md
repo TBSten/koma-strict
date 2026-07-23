@@ -859,10 +859,37 @@ public fun koma.core.StoreBuilder<FeedState, FeedAction, FeedEvent>.states(
  * Builds a [koma.core.Store] for [FeedState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<FeedState, FeedAction, FeedEvent>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [FeedState.Loading] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun feedStore(
+public fun createFeedStore(
+    initialState: FeedState.Loading,
+    loading: LoadingHandlersScope.() -> LoadingHandlers,
+    stable: StableGroupHandlersScope.() -> StableGroupHandlers,
+    error: ErrorHandlersScope.() -> ErrorHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<FeedState, FeedAction, FeedEvent>.() -> Unit = {},
+): koma.core.Store<FeedState, FeedAction, FeedEvent> =
+    koma.core.Store<FeedState, FeedAction, FeedEvent>(initialState = initialState, context = context) {
+        states(
+            loading = loading,
+            stable = stable,
+            error = error,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [FeedState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<FeedState, FeedAction, FeedEvent>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [FeedState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createFeedStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreFeedStore(
     initialState: FeedState,
     loading: LoadingHandlersScope.() -> LoadingHandlers,
     stable: StableGroupHandlersScope.() -> StableGroupHandlers,

@@ -423,10 +423,35 @@ public fun koma.core.StoreBuilder<DetailState, DetailAction, Nothing>.states(
  * Builds a [koma.core.Store] for [DetailState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<DetailState, DetailAction, Nothing>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [DetailState.Loading] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun detailStore(
+public fun createDetailStore(
+    initialState: DetailState.Loading,
+    loading: LoadingHandlersScope.() -> LoadingHandlers,
+    loaded: LoadedGroupHandlersScope.() -> LoadedGroupHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<DetailState, DetailAction, Nothing>.() -> Unit = {},
+): koma.core.Store<DetailState, DetailAction, Nothing> =
+    koma.core.Store<DetailState, DetailAction, Nothing>(initialState = initialState, context = context) {
+        states(
+            loading = loading,
+            loaded = loaded,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [DetailState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<DetailState, DetailAction, Nothing>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [DetailState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createDetailStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreDetailStore(
     initialState: DetailState,
     loading: LoadingHandlersScope.() -> LoadingHandlers,
     loaded: LoadedGroupHandlersScope.() -> LoadedGroupHandlers,

@@ -49,7 +49,7 @@ COMPILATION_ERROR
 
 ```text
 e: Error occurred in KSP, check log for detail
-e: [ksp] <TMPDIR>/Kotlin-Compilation<N>/sources/PlayerStates.kt:19: Invalid koma-strict usage: Generated declaration 'playerStore' in package 'example.clash' is generated more than once (by 'example.clash.Player' and 'example.clash.PlayerState'). Generated helper type names are derived from the state path without the root, and the store factory function name from the root name (with a trailing 'State' stripped), so nearby names collide within one package.
+e: [ksp] <TMPDIR>/Kotlin-Compilation<N>/sources/PlayerStates.kt:19: Invalid koma-strict usage: Generated declaration 'restorePlayerStore' in package 'example.clash' is generated more than once (by 'example.clash.Player' and 'example.clash.PlayerState'). Generated helper type names are derived from the state path without the root, and the store factory function name from the root name (with a trailing 'State' stripped), so nearby names collide within one package.
 
 Solution: 
   Rename one of the conflicting states (or roots), or move one @StoreSpec hierarchy to another package so the generated names stay unique.

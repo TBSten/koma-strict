@@ -45,9 +45,10 @@ private val lceDeclaration =
 internal fun lceScenarioSource(): SnapshotSource = SnapshotSource(fileName = "LceState.kt", code = lceDeclaration)
 
 /**
- * samples.md ケース 1 の利用側コード。生成 per-store factory (`lceStore`。型引数なしの糖衣入口)・
- * companion actions()・state factory・Scope API が実際に「利用側から書ける」ことのコンパイル証明
- * (strict の約束の e2e)。koma 直入口 (`Store {}` + states()) 側は他 scenario と integrationTest が担う。
+ * samples.md ケース 1 の利用側コード。生成 per-store factory (`createLceStore`。型引数なしの糖衣入口。
+ * initialState は宣言済み initial 候補 (`LceState.Loading`) に絞り込まれる)・companion actions()・
+ * state factory・Scope API が実際に「利用側から書ける」ことのコンパイル証明 (strict の約束の e2e)。
+ * koma 直入口 (`Store {}` + states()) 側は他 scenario と integrationTest が担う。
  */
 internal fun lceUsageSource(): SnapshotSource =
     SnapshotSource(
@@ -59,7 +60,7 @@ internal fun lceUsageSource(): SnapshotSource =
             import koma.core.Store
 
             fun buildLceStore(): Store<LceState, LceAction, LceEvent> =
-                lceStore(
+                createLceStore(
                     initialState = LceState.Loading(),
                     loading = LceState.Loading.actions(
                         enter = {

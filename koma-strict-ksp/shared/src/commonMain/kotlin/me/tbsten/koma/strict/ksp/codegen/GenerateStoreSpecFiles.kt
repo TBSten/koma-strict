@@ -38,7 +38,7 @@ public fun generateStoreSpecFiles(spec: StoreSpec): List<GeneratedFile> {
                 content =
                     buildList {
                         add(buildString { appendRootStates(env) })
-                        add(buildString { appendStoreFactory(env) })
+                        add(buildString { appendStoreFactories(env) })
                         if (rootEscapeMembers.isNotEmpty()) {
                             add(
                                 statesConfigureScopeSection(

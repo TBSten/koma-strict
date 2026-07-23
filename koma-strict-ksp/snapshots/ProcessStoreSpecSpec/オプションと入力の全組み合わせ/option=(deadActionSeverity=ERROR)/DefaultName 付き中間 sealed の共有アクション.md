@@ -642,10 +642,35 @@ public fun koma.core.StoreBuilder<FlowState, FlowAction, Nothing>.states(
  * Builds a [koma.core.Store] for [FlowState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<FlowState, FlowAction, Nothing>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [FlowState.Idle] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun flowStore(
+public fun createFlowStore(
+    initialState: FlowState.Idle,
+    idle: IdleHandlersScope.() -> IdleHandlers,
+    refresh: RefreshHandlersScope.() -> RefreshHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<FlowState, FlowAction, Nothing>.() -> Unit = {},
+): koma.core.Store<FlowState, FlowAction, Nothing> =
+    koma.core.Store<FlowState, FlowAction, Nothing>(initialState = initialState, context = context) {
+        states(
+            idle = idle,
+            refresh = refresh,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [FlowState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<FlowState, FlowAction, Nothing>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [FlowState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createFlowStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreFlowStore(
     initialState: FlowState,
     idle: IdleHandlersScope.() -> IdleHandlers,
     refresh: RefreshHandlersScope.() -> RefreshHandlers,

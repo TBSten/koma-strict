@@ -407,10 +407,35 @@ public fun koma.core.StoreBuilder<CounterState, CounterAction, Nothing>.states(
  * Builds a [koma.core.Store] for [CounterState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<CounterState, CounterAction, Nothing>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [CounterState.Idle] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun counterStore(
+public fun createCounterStore(
+    initialState: CounterState.Idle,
+    idle: IdleHandlersScope.() -> IdleHandlers,
+    confirming: ConfirmingHandlersScope.() -> ConfirmingHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<CounterState, CounterAction, Nothing>.() -> Unit = {},
+): koma.core.Store<CounterState, CounterAction, Nothing> =
+    koma.core.Store<CounterState, CounterAction, Nothing>(initialState = initialState, context = context) {
+        states(
+            idle = idle,
+            confirming = confirming,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [CounterState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<CounterState, CounterAction, Nothing>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [CounterState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createCounterStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreCounterStore(
     initialState: CounterState,
     idle: IdleHandlersScope.() -> IdleHandlers,
     confirming: ConfirmingHandlersScope.() -> ConfirmingHandlers,

@@ -330,10 +330,35 @@ internal fun koma.core.StoreBuilder<HiddenState, HiddenAction, Nothing>.states(
  * Builds a [koma.core.Store] for [HiddenState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<HiddenState, HiddenAction, Nothing>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [HiddenState.Idle] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-internal fun hiddenStore(
+internal fun createHiddenStore(
+    initialState: HiddenState.Idle,
+    idle: IdleHandlersScope.() -> IdleHandlers,
+    active: ActiveHandlersScope.() -> ActiveHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<HiddenState, HiddenAction, Nothing>.() -> Unit = {},
+): koma.core.Store<HiddenState, HiddenAction, Nothing> =
+    koma.core.Store<HiddenState, HiddenAction, Nothing>(initialState = initialState, context = context) {
+        states(
+            idle = idle,
+            active = active,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [HiddenState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<HiddenState, HiddenAction, Nothing>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [HiddenState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createHiddenStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+internal fun restoreHiddenStore(
     initialState: HiddenState,
     idle: IdleHandlersScope.() -> IdleHandlers,
     active: ActiveHandlersScope.() -> ActiveHandlers,

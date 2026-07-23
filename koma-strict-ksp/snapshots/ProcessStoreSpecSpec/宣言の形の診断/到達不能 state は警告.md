@@ -326,10 +326,35 @@ public fun koma.core.StoreBuilder<ReachState, ReachAction, Nothing>.states(
  * Builds a [koma.core.Store] for [ReachState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<ReachState, ReachAction, Nothing>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [ReachState.Start] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun reachStore(
+public fun createReachStore(
+    initialState: ReachState.Start,
+    start: StartHandlersScope.() -> StartHandlers,
+    orphan: OrphanHandlersScope.() -> OrphanHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<ReachState, ReachAction, Nothing>.() -> Unit = {},
+): koma.core.Store<ReachState, ReachAction, Nothing> =
+    koma.core.Store<ReachState, ReachAction, Nothing>(initialState = initialState, context = context) {
+        states(
+            start = start,
+            orphan = orphan,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [ReachState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<ReachState, ReachAction, Nothing>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [ReachState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createReachStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreReachStore(
     initialState: ReachState,
     start: StartHandlersScope.() -> StartHandlers,
     orphan: OrphanHandlersScope.() -> OrphanHandlers,

@@ -10,10 +10,11 @@ import me.tbsten.koma.strict.ksp.model.StateParent
 import me.tbsten.koma.strict.ksp.model.StatePath
 import me.tbsten.koma.strict.ksp.model.hasOwnHandlerDeclarations
 import me.tbsten.koma.strict.ksp.model.leavesWithPath
+import me.tbsten.koma.strict.ksp.naming.createStoreFactoryFunctionName
+import me.tbsten.koma.strict.ksp.naming.restoreStoreFactoryFunctionName
 import me.tbsten.koma.strict.ksp.naming.rootStatesJvmName
 import me.tbsten.koma.strict.ksp.naming.stateParamName
 import me.tbsten.koma.strict.ksp.naming.statesConfigureScopeTypeName
-import me.tbsten.koma.strict.ksp.naming.storeFactoryFunctionName
 
 /**
  * The koma package. Generated code has no import boilerplate, so it references koma
@@ -88,29 +89,77 @@ internal fun rootStatesConfigureScopeType(env: CodegenEnv): String =
     statesConfigureScopeTypeName(env.prefix(StatePath.root))
 
 /**
- * The per-store factory function (`lceStore(...)`), generated next to the root `states()`
- * extension. A type-argument-free sugar entry point over the canonical koma form —
- * `Store<S, A, E>(initialState) { states(...) }` builds the exact same store. The params
- * mirror `states(...)` (same order, both call styles); the trailing `configuration` param
- * appends raw koma DSL after the generated handlers (store-level escape hatch), so no
- * sentinel is needed. `context` follows koma rc02's `Store()` factory signature
+ * The per-store factory functions, generated next to the root `states()` extension.
+ * Type-argument-free sugar entry points over the canonical koma form —
+ * `Store<S, A, E>(initialState) { states(...) }` builds the exact same store. Two flavors:
+ * - `create{Root}Store` — one overload per `@StoreSpec(initial = ...)` candidate, `initialState`
+ *   narrowed to that candidate's own type (compile-time enforced). Not generated when `initial`
+ *   is undeclared (nothing to narrow to).
+ * - `restore{Root}Store` — `initialState` stays the root type (any state), for restoring a
+ *   persisted state or starting mid-flow in tests. Always generated.
+ *
+ * Both mirror `states(...)`'s params (same order, both call styles); the trailing
+ * `configuration` param appends raw koma DSL after the generated handlers (store-level escape
+ * hatch), so no sentinel is needed. `context` follows koma rc02's `Store()` factory signature
  * (`CoroutineContext? = null`).
  */
-internal fun Appendable.appendStoreFactory(env: CodegenEnv) {
+internal fun Appendable.appendStoreFactories(env: CodegenEnv) {
+    val createPaths = env.spec.initial
+    val createName = createStoreFactoryFunctionName(env.root)
+
+    createPaths.forEach { path ->
+        appendStoreFactoryFunction(
+            env = env,
+            functionName = createName,
+            initialStateType = env.stateRef(path),
+            initialStateKdocLines =
+                listOf(
+                    " * builds the exact same store. [initialState] is narrowed to the declared",
+                    " * `@StoreSpec(initial = ...)` candidate [${env.stateRef(path)}] — compile-time enforced.",
+                    " * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).",
+                ),
+        )
+        appendLine()
+    }
+    appendStoreFactoryFunction(
+        env = env,
+        functionName = restoreStoreFactoryFunctionName(env.root),
+        initialStateType = env.rootRef,
+        initialStateKdocLines =
+            if (createPaths.isEmpty()) {
+                listOf(
+                    " * builds the exact same store. [configuration] appends raw koma DSL after the generated",
+                    " * handlers (store-level escape hatch).",
+                )
+            } else {
+                listOf(
+                    " * builds the exact same store. [initialState] accepts any [${env.rootRef}] — for",
+                    " * restoring a persisted state or starting mid-flow in tests, where [$createName]'s",
+                    " * compile-time-narrowed initial state does not apply. [configuration] appends raw koma",
+                    " * DSL after the generated handlers (store-level escape hatch).",
+                )
+            },
+    )
+}
+
+private fun Appendable.appendStoreFactoryFunction(
+    env: CodegenEnv,
+    functionName: String,
+    initialStateType: String,
+    initialStateKdocLines: List<String>,
+) {
     val root = env.root
     val params = statesParams(env, StatePath.root, root)
-    val factoryName = storeFactoryFunctionName(root)
     val typeArgs = "<${env.rootRef}, ${env.actionsRef}, ${env.eventsOrNothingRef}>"
 
     appendLine("/**")
     appendLine(" * Builds a [$KOMA_CORE_PACKAGE.Store] for [${env.rootRef}] without spelling the store type arguments.")
     appendLine(" *")
     appendLine(" * Sugar over the canonical koma entry point — `Store$typeArgs(initialState) { states(...) }`")
-    appendLine(" * builds the exact same store. [configuration] appends raw koma DSL after the generated")
-    appendLine(" * handlers (store-level escape hatch).")
+    initialStateKdocLines.forEach(::appendLine)
     appendLine(" */")
-    appendLine("${env.visibility} fun $factoryName(")
-    appendLine("    initialState: ${env.rootRef},")
+    appendLine("${env.visibility} fun $functionName(")
+    appendLine("    initialState: $initialStateType,")
     params.forEach { appendLine("    ${it.name}: ${it.paramType},") }
     appendLine("    context: kotlin.coroutines.CoroutineContext? = null,")
     appendLine("    configuration: $KOMA_CORE_PACKAGE.StoreBuilder$typeArgs.() -> Unit = {},")

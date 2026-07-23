@@ -53,8 +53,9 @@ private val samplesLceUsage =
 
     import koma.core.Store
 
-    // 主: 生成 per-store factory 経由(型引数を書かない糖衣入口。命名 = root 名の末尾 State を strip + Store)
-    val store = lceStore(
+    // 主: 生成 per-store factory 経由(型引数を書かない糖衣入口。命名 = root 名の末尾 State を strip +
+    // create/restore + Store。initialState を宣言済み initial 候補に絞り込む createLceStore を使う)
+    val store = createLceStore(
         initialState = LceState.Loading(),
         loading = LceState.Loading.actions(
             enter = {

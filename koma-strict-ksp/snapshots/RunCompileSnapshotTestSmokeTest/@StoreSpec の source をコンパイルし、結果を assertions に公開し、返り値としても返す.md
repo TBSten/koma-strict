@@ -203,7 +203,7 @@ public fun koma.core.StoreBuilder<MyState, MyAction, Nothing>.states(
  * builds the exact same store. [configuration] appends raw koma DSL after the generated
  * handlers (store-level escape hatch).
  */
-public fun myStore(
+public fun restoreMyStore(
     initialState: MyState,
     idle: IdleHandlersScope.() -> IdleHandlers,
     context: kotlin.coroutines.CoroutineContext? = null,

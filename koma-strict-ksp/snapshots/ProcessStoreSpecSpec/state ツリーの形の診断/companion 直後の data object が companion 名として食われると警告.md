@@ -192,7 +192,7 @@ public fun koma.core.StoreBuilder<SuspiciousState, ScAction, Nothing>.states(
  * builds the exact same store. [configuration] appends raw koma DSL after the generated
  * handlers (store-level escape hatch).
  */
-public fun suspiciousStore(
+public fun restoreSuspiciousStore(
     initialState: SuspiciousState,
     away: AwayHandlersScope.() -> AwayHandlers,
     context: kotlin.coroutines.CoroutineContext? = null,

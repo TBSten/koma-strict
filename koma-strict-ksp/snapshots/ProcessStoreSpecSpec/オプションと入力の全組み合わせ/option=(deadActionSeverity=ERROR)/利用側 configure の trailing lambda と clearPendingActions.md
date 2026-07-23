@@ -430,10 +430,37 @@ public fun koma.core.StoreBuilder<LceState, LceAction, LceEvent>.states(
  * Builds a [koma.core.Store] for [LceState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<LceState, LceAction, LceEvent>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [LceState.Loading] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun lceStore(
+public fun createLceStore(
+    initialState: LceState.Loading,
+    loading: LoadingHandlersScope.() -> LoadingHandlers,
+    content: ContentHandlersScope.() -> ContentHandlers,
+    error: ErrorHandlersScope.() -> ErrorHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<LceState, LceAction, LceEvent>.() -> Unit = {},
+): koma.core.Store<LceState, LceAction, LceEvent> =
+    koma.core.Store<LceState, LceAction, LceEvent>(initialState = initialState, context = context) {
+        states(
+            loading = loading,
+            content = content,
+            error = error,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [LceState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<LceState, LceAction, LceEvent>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [LceState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createLceStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreLceStore(
     initialState: LceState,
     loading: LoadingHandlersScope.() -> LoadingHandlers,
     content: ContentHandlersScope.() -> ContentHandlers,

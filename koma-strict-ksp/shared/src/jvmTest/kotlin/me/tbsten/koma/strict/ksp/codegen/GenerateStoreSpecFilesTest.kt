@@ -139,10 +139,14 @@ internal class GenerateStoreSpecFilesTest :
             }
         }
 
-        "per-store factory 関数が states() と同一 param 列 + context + configuration で生成される" {
+        "per-store factory 関数が states() と同一 param 列 + context + configuration で create/restore 両方生成される" {
             val storeSpecFile = byName.getValue("LceState.storeSpec.generated")
             withClue(storeSpecFile) {
-                storeSpecFile shouldContain "public fun lceStore("
+                // create{Root}Store: initial 候補 (LceState.Loading) に絞り込まれた overload
+                storeSpecFile shouldContain "public fun createLceStore("
+                storeSpecFile shouldContain "    initialState: LceState.Loading,"
+                // restore{Root}Store: root 型のまま (どの state からでも起動できる)
+                storeSpecFile shouldContain "public fun restoreLceStore("
                 storeSpecFile shouldContain "    initialState: LceState,"
                 storeSpecFile shouldContain "    context: kotlin.coroutines.CoroutineContext? = null,"
                 storeSpecFile shouldContain
@@ -154,7 +158,20 @@ internal class GenerateStoreSpecFilesTest :
                 storeSpecFile shouldContain "            loading = loading,"
                 storeSpecFile shouldContain "        configuration()"
                 // factory の末尾は configuration = 意図された trailing lambda (センチネルは付けない)
-                storeSpecFile shouldNotContain "lceStore(\n    preventTrailingLambda"
+                storeSpecFile shouldNotContain "Store(\n    preventTrailingLambda"
+            }
+        }
+
+        "initial 未宣言の storeSpec では create{Root}Store は生成されず restore{Root}Store だけが生成される" {
+            val noInitialSpec = lceSpec.copy(initial = emptyList())
+            val storeSpecFile =
+                generateStoreSpecFiles(noInitialSpec)
+                    .first { it.fileName == "LceState.storeSpec.generated" }
+                    .content
+            withClue(storeSpecFile) {
+                storeSpecFile shouldNotContain "fun createLceStore("
+                storeSpecFile shouldContain "public fun restoreLceStore("
+                storeSpecFile shouldContain "    initialState: LceState,"
             }
         }
 
@@ -261,8 +278,9 @@ internal class GenerateStoreSpecFilesTest :
             val storeSpecFile = generated.getValue("LceState.storeSpec.generated")
             storeSpecFile shouldContain
                 "internal fun koma.core.StoreBuilder<LceState, LceAction, LceEvent>.states("
-            // per-store factory も可視性を継承する
-            storeSpecFile shouldContain "internal fun lceStore("
+            // per-store factory も可視性を継承する (create/restore 両方)
+            storeSpecFile shouldContain "internal fun createLceStore("
+            storeSpecFile shouldContain "internal fun restoreLceStore("
         }
 
         "leaf が継承 prop を狭い型で override すると leaf 側の型が生成に使われる (子勝ち)" {

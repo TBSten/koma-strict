@@ -773,10 +773,39 @@ public fun koma.core.StoreBuilder<WizardState, WizardAction, WizardEvent>.states
  * Builds a [koma.core.Store] for [WizardState] without spelling the store type arguments.
  *
  * Sugar over the canonical koma entry point — `Store<WizardState, WizardAction, WizardEvent>(initialState) { states(...) }`
- * builds the exact same store. [configuration] appends raw koma DSL after the generated
- * handlers (store-level escape hatch).
+ * builds the exact same store. [initialState] is narrowed to the declared
+ * `@StoreSpec(initial = ...)` candidate [WizardState.Step1] — compile-time enforced.
+ * [configuration] appends raw koma DSL after the generated handlers (store-level escape hatch).
  */
-public fun wizardStore(
+public fun createWizardStore(
+    initialState: WizardState.Step1,
+    step1: Step1HandlersScope.() -> Step1Handlers,
+    step2: Step2HandlersScope.() -> Step2Handlers,
+    step3: Step3HandlersScope.() -> Step3Handlers,
+    submitting: SubmittingHandlersScope.() -> SubmittingHandlers,
+    context: kotlin.coroutines.CoroutineContext? = null,
+    configuration: koma.core.StoreBuilder<WizardState, WizardAction, WizardEvent>.() -> Unit = {},
+): koma.core.Store<WizardState, WizardAction, WizardEvent> =
+    koma.core.Store<WizardState, WizardAction, WizardEvent>(initialState = initialState, context = context) {
+        states(
+            step1 = step1,
+            step2 = step2,
+            step3 = step3,
+            submitting = submitting,
+        )
+        configuration()
+    }
+
+/**
+ * Builds a [koma.core.Store] for [WizardState] without spelling the store type arguments.
+ *
+ * Sugar over the canonical koma entry point — `Store<WizardState, WizardAction, WizardEvent>(initialState) { states(...) }`
+ * builds the exact same store. [initialState] accepts any [WizardState] — for
+ * restoring a persisted state or starting mid-flow in tests, where [createWizardStore]'s
+ * compile-time-narrowed initial state does not apply. [configuration] appends raw koma
+ * DSL after the generated handlers (store-level escape hatch).
+ */
+public fun restoreWizardStore(
     initialState: WizardState,
     step1: Step1HandlersScope.() -> Step1Handlers,
     step2: Step2HandlersScope.() -> Step2Handlers,
