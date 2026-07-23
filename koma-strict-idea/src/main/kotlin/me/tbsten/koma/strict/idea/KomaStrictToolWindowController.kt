@@ -6,23 +6,32 @@ import androidx.compose.runtime.setValue
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.WriteIntentReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.IndexNotReadyException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiTreeChangeAdapter
 import com.intellij.psi.PsiTreeChangeEvent
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
+import me.tbsten.koma.strict.idea.flow.GeneratedFlowSpec
+import me.tbsten.koma.strict.idea.frontend.FlowSpecInserter
 import me.tbsten.koma.strict.idea.frontend.PsiSourceAnchor
 import me.tbsten.koma.strict.idea.frontend.StoreSpecModelBuilder
+import me.tbsten.koma.strict.idea.frontend.TestFileGenerator
 import me.tbsten.koma.strict.idea.model.SourceAnchor
 import me.tbsten.koma.strict.idea.model.StoreDiagramModel
+import me.tbsten.koma.strict.idea.ui.RecordingState
+import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import java.util.concurrent.atomic.AtomicLong
@@ -54,6 +63,12 @@ internal class KomaStrictToolWindowController(
      */
     var indexing: Boolean by mutableStateOf(false)
         private set
+
+    /**
+     * Flow recorder state, **owned by the controller** (not the composable) so a recording survives file
+     * switches, store-dropdown switches, and tool-window hide/show. The content reads it via a parameter.
+     */
+    val recording = RecordingState()
 
     // updates flush on the EDT (SWING_THREAD alarm), so mutating [stores] from here is EDT-safe.
     private val queue = MergingUpdateQueue(
@@ -205,6 +220,56 @@ internal class KomaStrictToolWindowController(
             .computeBlocking<KtElement?, RuntimeException> {
                 (anchor as? PsiSourceAnchor)?.element?.takeIf { it.canNavigate() }
             }?.navigate(true)
+    }
+
+    /**
+     * Inserts a recorded flow's `@FlowSpec` into the store's source file (`ide-test-code.md` F8): the
+     * anchor is the `@StoreSpec` root's [PsiSourceAnchor]. Resolves it in a read action, then delegates
+     * the write to [FlowSpecInserter] (its own [com.intellij.openapi.command.WriteCommandAction]); the
+     * inserted declaration is navigated to so the edit is visible. Must run on the EDT.
+     */
+    fun insertFlowSpec(anchor: SourceAnchor, generated: GeneratedFlowSpec) {
+        val root = ReadAction.computeBlocking<KtClassOrObject?, RuntimeException> {
+            (anchor as? PsiSourceAnchor)?.element as? KtClassOrObject
+        } ?: return
+        val inserted = FlowSpecInserter.insert(project, root, generated)
+        // canNavigate() は PSI read なので read action 内で確定し、navigate(true) だけ EDT で呼ぶ。
+        ReadAction
+            .computeBlocking<Unit, RuntimeException> {
+                (inserted as? Navigatable)?.takeIf { it.canNavigate() }
+                    ?.navigate(true)
+            }
+    }
+
+    /**
+     * Writes the generated koma-test into the test source set for the store's file (`ide-test-code.md`):
+     * resolves the `@StoreSpec` root + its package in a read action, delegates the file write to
+     * [TestFileGenerator], then opens the created file. Must run on the EDT.
+     */
+    fun generateTestFile(anchor: SourceAnchor, fileName: String, content: String) {
+        val (root, pkg) = ReadAction.computeBlocking<Pair<KtClassOrObject, String>?, RuntimeException> {
+            val r = (anchor as? PsiSourceAnchor)?.element as? KtClassOrObject ?: return@computeBlocking null
+            r to r.containingKtFile.packageFqName.asString()
+        } ?: return
+        // 同名ファイルがあれば雑に上書きせず確認する (ide-test-code.md)。VFS 読みは read action 内で。
+        val existing = ReadAction.computeBlocking<VirtualFile?, RuntimeException> {
+            TestFileGenerator.existingTestFile(project, root, pkg, fileName)
+        }
+        if (existing != null) {
+            val choice = Messages.showYesNoDialog(
+                project,
+                "${existing.path} already exists.\nOverwrite it with the generated test?",
+                "Overwrite Test File?",
+                "Overwrite",
+                "Cancel",
+                Messages.getQuestionIcon(),
+            )
+            if (choice != Messages.YES) return
+        }
+        val file = TestFileGenerator.generate(project, root, pkg, fileName, content) ?: return
+        WriteIntentReadAction.run {
+            FileEditorManager.getInstance(project).openFile(file, true)
+        }
     }
 
     private companion object {

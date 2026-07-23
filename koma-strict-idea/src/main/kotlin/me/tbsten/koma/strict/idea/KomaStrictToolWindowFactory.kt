@@ -32,6 +32,9 @@ internal class KomaStrictToolWindowFactory : ToolWindowFactory, DumbAware {
                 onNavigate = controller::navigate,
                 indexing = controller.indexing,
                 onReload = controller::reload,
+                onInsertFlowSpec = controller::insertFlowSpec,
+                onGenerateTestFile = controller::generateTestFile,
+                recording = controller.recording,
             )
         }
         controller.start()
